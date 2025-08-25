@@ -1,0 +1,67 @@
+{
+  "name": "wordpress-docker-dev",
+  "version": "1.0.0",
+  "description": "WordPress Docker Development Environment with Custom REST API Plugin",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:detach": "docker-compose -f docker-compose.dev.yml up -d --build",
+    "dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
+    "dev:stop": "docker-compose -f docker-compose.dev.yml down",
+    "dev:restart": "docker-compose -f docker-compose.dev.yml restart",
+    "dev:clean": "docker-compose -f docker-compose.dev.yml down -v --remove-orphans",
+    "prod": "node scripts/prod.js",
+    "prod:detach": "docker-compose up -d --build",
+    "prod:logs": "docker-compose logs -f",
+    "prod:stop": "docker-compose down",
+    "prod:restart": "docker-compose restart",
+    "prod:clean": "docker-compose down -v --remove-orphans",
+    "test:api": "node scripts/test-api.js",
+    "test:api:health": "node scripts/test-api.js --endpoint=health",
+    "test:api:posts": "node scripts/test-api.js --endpoint=posts",
+    "test:api:users": "node scripts/test-api.js --endpoint=users",
+    "test:api:node-data": "node scripts/test-api.js --endpoint=node-data",
+    "test:api:verbose": "node scripts/test-api.js --verbose",
+    "build:plugin": "cd wp-content/plugins/custom-rest-api && npm run build",
+    "watch:plugin": "cd wp-content/plugins/custom-rest-api && npm run watch",
+    "install:plugin": "cd wp-content/plugins/custom-rest-api && npm install",
+    "status": "docker-compose ps",
+    "status:dev": "docker-compose -f docker-compose.dev.yml ps",
+    "shell": "docker-compose exec wordpress bash",
+    "shell:dev": "docker-compose -f docker-compose.dev.yml exec wordpress bash",
+    "db:shell": "docker-compose exec db mysql -u wordpress -pwordpress_password wordpress",
+    "db:shell:dev": "docker-compose -f docker-compose.dev.yml exec db mysql -u wordpress -pwordpress_password wordpress",
+    "logs:wordpress": "docker-compose logs wordpress",
+    "logs:wordpress:dev": "docker-compose -f docker-compose.dev.yml logs wordpress",
+    "logs:db": "docker-compose logs db",
+    "logs:db:dev": "docker-compose -f docker-compose.dev.yml logs db",
+    "logs:dev-tools": "docker-compose -f docker-compose.dev.yml logs dev-tools",
+    "clean:all": "docker system prune -f && docker volume prune -f",
+    "reset:dev": "npm run dev:clean && npm run dev",
+    "reset:prod": "npm run prod:clean && npm run prod",
+    "startup:test": "node start-wordpress.js",
+    "help": "echo 'Available commands:' && npm run"
+  },
+  "keywords": [
+    "wordpress",
+    "docker",
+    "development",
+    "rest-api",
+    "typescript",
+    "plugin"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "your-repository-url"
+  },
+  "bugs": {
+    "url": "your-repository-url/issues"
+  },
+  "homepage": "your-repository-url#readme"
+}
