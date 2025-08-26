@@ -60,20 +60,46 @@ function makeRequest(url) {
   });
 }
 
-function checkWordPress() {
+function checkWordPress(appName = null) {
   log('🔍 Checking if WordPress is running...', 'cyan');
-  try {
-    execSync('curl -s http://localhost > /dev/null', { stdio: 'pipe' });
-    log('✅ WordPress is running', 'green');
-    return true;
-  } catch (error) {
-    log(
-      '❌ WordPress is not running. Please start the Docker environment first.',
-      'red',
-    );
-    log('   Run: npm run dev:detach or npm run prod:detach', 'yellow');
-    return false;
+  
+  // Define app configurations
+  const apps = {
+    app_a: { port: 3000, name: 'App A' },
+    app_b: { port: 3001, name: 'App B' },
+    app_c: { port: 3002, name: 'App C' }
+  };
+  
+  // If specific app is requested, check only that one
+  if (appName && apps[appName]) {
+    const app = apps[appName];
+    try {
+      execSync(`curl -s http://localhost:${app.port} > /dev/null`, { stdio: 'pipe' });
+      log(`✅ ${app.name} is running on port ${app.port}`, 'green');
+      return { port: app.port, name: app.name };
+    } catch (error) {
+      log(`❌ ${app.name} is not running on port ${app.port}`, 'red');
+      return false;
+    }
   }
+  
+  // Check all apps and return the first one that's running
+  for (const [key, app] of Object.entries(apps)) {
+    try {
+      execSync(`curl -s http://localhost:${app.port} > /dev/null`, { stdio: 'pipe' });
+      log(`✅ ${app.name} is running on port ${app.port}`, 'green');
+      return { port: app.port, name: app.name, key };
+    } catch (error) {
+      // Continue to next app
+    }
+  }
+  
+  log(
+    '❌ No WordPress apps are running. Please start the Docker environment first.',
+    'red',
+  );
+  log('   Run: npm run dev:detach or npm run prod:detach', 'yellow');
+  return false;
 }
 
 async function testEndpoint(name, url) {
@@ -100,12 +126,16 @@ async function testEndpoint(name, url) {
 async function main() {
   log('🧪 Testing Custom REST API Plugin...', 'bright');
 
+  // Parse command line arguments
+  const options = parseArgs();
+  
   // Check if WordPress is running
-  if (!checkWordPress()) {
+  const appInfo = checkWordPress(options.app);
+  if (!appInfo) {
     process.exit(1);
   }
 
-  const baseUrl = 'http://localhost/wp-json/custom-api/v1';
+  const baseUrl = `http://localhost:${appInfo.port}/wp-json/custom-api/v1`;
 
   // Test all endpoints
   const endpoints = [
@@ -122,7 +152,7 @@ async function main() {
   log('\n🎉 API testing completed!', 'green');
   log('\n💡 To test with authentication, you can use:', 'yellow');
   log(
-    'curl -H "X-WP-Nonce: YOUR_NONCE" http://localhost/wp-json/custom-api/v1/health',
+    `curl -H "X-WP-Nonce: YOUR_NONCE" http://localhost:${appInfo.port}/wp-json/custom-api/v1/health`,
     'cyan',
   );
 
@@ -140,6 +170,7 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const options = {
     endpoint: null,
+    app: null,
     auth: false,
     verbose: false,
   };
@@ -150,6 +181,9 @@ function parseArgs() {
     if (arg === '--endpoint' && args[i + 1]) {
       options.endpoint = args[i + 1];
       i++;
+    } else if (arg === '--app' && args[i + 1]) {
+      options.app = args[i + 1];
+      i++;
     } else if (arg === '--auth') {
       options.auth = true;
     } else if (arg === '--verbose') {
@@ -159,6 +193,10 @@ function parseArgs() {
       log('\nOptions:', 'bright');
       log(
         '  --endpoint <name>  Test specific endpoint (health, posts, users, node-data)',
+        'cyan',
+      );
+      log(
+        '  --app <name>      Test specific app (app_a, app_b, app_c)',
         'cyan',
       );
       log(
@@ -180,6 +218,10 @@ if (require.main === module) {
 
   if (options.verbose) {
     log('Verbose mode enabled', 'yellow');
+  }
+
+  if (options.app) {
+    log(`Testing app: ${options.app}`, 'yellow');
   }
 
   main().catch((error) => {

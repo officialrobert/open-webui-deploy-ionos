@@ -4,9 +4,10 @@ This project provides a complete Docker setup for running WordPress with a custo
 
 ## 🏗️ Architecture
 
-- **WordPress**: PHP 8.2 with Apache
+- **WordPress Apps**: 3 separate WordPress instances (App A, App B, App C)
 - **Custom REST API Plugin**: TypeScript-based plugin with Node.js-like functionality
-- **Database**: MySQL 8.0
+- **Database**: MySQL 8.0 (shared across all apps)
+
 - **Development Tools**: Hot reloading, TypeScript compilation, debugging
 - **Production**: Optimized builds, performance tuning
 
@@ -16,13 +17,14 @@ This project provides a complete Docker setup for running WordPress with a custo
 apps/wordpress/
 ├── Dockerfile                    # Production Dockerfile
 ├── Dockerfile.dev               # Development Dockerfile
-├── docker-compose.yml           # Production docker-compose
-├── docker-compose.dev.yml       # Development docker-compose
+├── docker-compose.yml           # Production docker-compose (3 apps)
+├── docker-compose.dev.yml       # Development docker-compose (3 apps)
+
 ├── .dockerignore                # Docker ignore rules
 ├── scripts/
-│   ├── dev.sh                   # Development startup script
-│   ├── prod.sh                  # Production startup script
-│   └── test-api.sh              # API testing script
+│   ├── dev.js                   # Development startup script
+│   ├── prod.js                  # Production startup script
+│   └── test-api.js              # API testing script
 ├── wp-content/
 │   └── plugins/
 │       └── custom-rest-api/     # Custom REST API plugin
@@ -63,7 +65,7 @@ chmod +x scripts/*.sh
 cd apps/wordpress
 
 # Start production environment
-./scripts/prod.sh
+npm run prod
 ```
 
 **Production Features:**
@@ -72,6 +74,8 @@ cd apps/wordpress
 - ✅ Pre-compiled TypeScript
 - ✅ Security hardened
 - ✅ Production-ready configuration
+
+
 
 ## 🔧 Manual Docker Commands
 
@@ -136,10 +140,31 @@ curl http://localhost/wp-json/custom-api/v1/node-data
 
 Once the environment is running, you can access:
 
-- **WordPress Site**: http://localhost
-- **WordPress Admin**: http://localhost/wp-admin
+### Development Environment
+- **App A - WordPress**: http://localhost:3000
+- **App A - Admin**: http://localhost:3000/wp-admin
+- **App B - WordPress**: http://localhost:3001
+- **App B - Admin**: http://localhost:3001/wp-admin
+- **App C - WordPress**: http://localhost:3002
+- **App C - Admin**: http://localhost:3002/wp-admin
 - **phpMyAdmin**: http://localhost:8080
-- **Custom REST API**: http://localhost/wp-json/custom-api/v1/health
+- **App A - REST API**: http://localhost:3000/wp-json/custom-api/v1/health
+- **App B - REST API**: http://localhost:3001/wp-json/custom-api/v1/health
+- **App C - REST API**: http://localhost:3002/wp-json/custom-api/v1/health
+
+### Production Environment
+- **App A - WordPress**: http://localhost:3000
+- **App A - Admin**: http://localhost:3000/wp-admin
+- **App B - WordPress**: http://localhost:3001
+- **App B - Admin**: http://localhost:3001/wp-admin
+- **App C - WordPress**: http://localhost:3002
+- **App C - Admin**: http://localhost:3002/wp-admin
+- **phpMyAdmin**: http://localhost:8080
+- **App A - REST API**: http://localhost:3000/wp-json/custom-api/v1/health
+- **App B - REST API**: http://localhost:3001/wp-json/custom-api/v1/health
+- **App C - REST API**: http://localhost:3002/wp-json/custom-api/v1/health
+
+
 
 ## 🔧 Development Workflow
 

@@ -47,17 +47,36 @@ function checkDocker() {
 }
 
 function waitForWordPress() {
-  log('⏳ Waiting for WordPress to be ready...', 'yellow');
+  log('⏳ Waiting for WordPress apps to be ready...', 'yellow');
 
   return new Promise((resolve) => {
+    const apps = [
+      { port: 3000, name: 'App A' },
+      { port: 3001, name: 'App B' },
+      { port: 3002, name: 'App C' }
+    ];
+    
+    let readyApps = 0;
+    const totalApps = apps.length;
+    
     const checkInterval = setInterval(() => {
-      try {
-        execSync('curl -s http://localhost > /dev/null', { stdio: 'pipe' });
+      apps.forEach((app, index) => {
+        if (!app.ready) {
+          try {
+            execSync(`curl -s http://localhost:${app.port} > /dev/null`, { stdio: 'pipe' });
+            app.ready = true;
+            readyApps++;
+            log(`✅ ${app.name} is ready on port ${app.port}!`, 'green');
+          } catch (error) {
+            // App not ready yet
+          }
+        }
+      });
+      
+      if (readyApps === totalApps) {
         clearInterval(checkInterval);
-        log('✅ WordPress is ready!', 'green');
+        log('✅ All WordPress apps are ready!', 'green');
         resolve();
-      } catch (error) {
-        // WordPress not ready yet, continue waiting
       }
     }, 5000);
   });
@@ -65,11 +84,23 @@ function waitForWordPress() {
 
 function displayAccessInfo() {
   log('\n🌐 Access your applications:', 'bright');
-  log('   WordPress: http://localhost', 'cyan');
-  log('   WordPress Admin: http://localhost/wp-admin', 'cyan');
+  log('   App A - WordPress: http://localhost:3000', 'cyan');
+  log('   App A - Admin: http://localhost:3000/wp-admin', 'cyan');
+  log('   App B - WordPress: http://localhost:3001', 'cyan');
+  log('   App B - Admin: http://localhost:3001/wp-admin', 'cyan');
+  log('   App C - WordPress: http://localhost:3002', 'cyan');
+  log('   App C - Admin: http://localhost:3002/wp-admin', 'cyan');
   log('   phpMyAdmin: http://localhost:8080', 'cyan');
   log(
-    '   Custom REST API: http://localhost/wp-json/custom-api/v1/health',
+    '   App A - REST API: http://localhost:3000/wp-json/custom-api/v1/health',
+    'cyan',
+  );
+  log(
+    '   App B - REST API: http://localhost:3001/wp-json/custom-api/v1/health',
+    'cyan',
+  );
+  log(
+    '   App C - REST API: http://localhost:3002/wp-json/custom-api/v1/health',
     'cyan',
   );
 

@@ -1,4 +1,4 @@
-# Production Dockerfile for WordPress + Custom REST API Plugin
+# Universal Dockerfile for WordPress + Custom REST API Plugin (Dev & Prod)
 FROM php:8.2-apache
 
 # Install system dependencies
@@ -36,7 +36,7 @@ WORKDIR /var/www/html/wp-content/plugins/custom-rest-api
 COPY wp-content/plugins/custom-rest-api/package*.json ./
 COPY wp-content/plugins/custom-rest-api/tsconfig.json ./
 
-# Install Node.js dependencies and build TypeScript
+# Install Node.js dependencies (will be overridden in dev with npm install)
 RUN npm ci --only=production && \
     npm run build
 
@@ -62,8 +62,9 @@ RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli
 COPY start-wordpress.js /usr/local/bin/start-wordpress.js
 RUN chmod +x /usr/local/bin/start-wordpress.js
 
-# Expose port
-EXPOSE 80
+# Expose ports for all apps (will be configured by startup script)
+EXPOSE 3000 3001 3002
+
 
 # Start WordPress
 CMD ["node", "/usr/local/bin/start-wordpress.js"]

@@ -65,6 +65,15 @@ function createWpConfig() {
     const dbHost = process.env.WORDPRESS_DB_HOST || 'db:3306';
     const tablePrefix = process.env.WORDPRESS_TABLE_PREFIX || 'wp_';
     
+    // Create database if it doesn't exist
+    try {
+      log(`Creating database '${dbName}' if it doesn't exist...`, 'cyan');
+      execCommandSilent(`mysql -h"${dbHost.split(':')[0]}" -P"${dbHost.split(':')[1] || '3306'}" -u"${dbUser}" -p"${dbPassword}" -e "CREATE DATABASE IF NOT EXISTS ${dbName};"`);
+      log(`Database '${dbName}' is ready`, 'green');
+    } catch (error) {
+      log(`Warning: Could not create database '${dbName}'. It may already exist.`, 'yellow');
+    }
+    
     configContent = configContent.replace(
       /define\( 'DB_NAME', 'database_name_here' \);/g,
       `define( 'DB_NAME', '${dbName}' );`
@@ -201,6 +210,12 @@ async function main() {
     log('   WordPress Admin: http://localhost/wp-admin', 'cyan');
     log('   phpMyAdmin: http://localhost:8080', 'cyan');
     log('   Custom REST API: http://localhost/wp-json/custom-api/v1/health', 'cyan');
+    
+    // Configure Apache to listen on the correct port
+    const port = process.env.WORDPRESS_PORT || '80';
+    log(`\n🔧 Configuring Apache for port ${port}...`, 'cyan');
+    execCommand(`sed -i "s/Listen 80/Listen ${port}/" /etc/apache2/ports.conf`);
+    execCommand(`sed -i "s/<VirtualHost \\*:80>/<VirtualHost *:${port}>/" /etc/apache2/sites-available/000-default.conf`);
     
     // Start Apache
     log('\n🔧 Starting Apache...', 'cyan');
