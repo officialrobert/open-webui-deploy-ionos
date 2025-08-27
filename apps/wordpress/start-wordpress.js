@@ -65,15 +65,6 @@ function createWpConfig() {
     const dbHost = process.env.WORDPRESS_DB_HOST || 'db:3306';
     const tablePrefix = process.env.WORDPRESS_TABLE_PREFIX || 'wp_';
     
-    // Create database if it doesn't exist
-    try {
-      log(`Creating database '${dbName}' if it doesn't exist...`, 'cyan');
-      execCommandSilent(`mysql -h"${dbHost.split(':')[0]}" -P"${dbHost.split(':')[1] || '3306'}" -u"${dbUser}" -p"${dbPassword}" -e "CREATE DATABASE IF NOT EXISTS ${dbName};"`);
-      log(`Database '${dbName}' is ready`, 'green');
-    } catch (error) {
-      log(`Warning: Could not create database '${dbName}'. It may already exist.`, 'yellow');
-    }
-    
     configContent = configContent.replace(
       /define\( 'DB_NAME', 'database_name_here' \);/g,
       `define( 'DB_NAME', '${dbName}' );`
@@ -114,12 +105,6 @@ define( 'WP_DEBUG_LOG', false );
 `;
     }
     
-    // Add extra configuration if provided
-    const configExtra = process.env.WORDPRESS_CONFIG_EXTRA;
-    if (configExtra) {
-      configContent += `\n${configExtra}\n`;
-    }
-    
     // Write the updated config
     fs.writeFileSync(wpConfigPath, configContent);
     
@@ -130,37 +115,68 @@ define( 'WP_DEBUG_LOG', false );
 }
 
 function waitForDatabase() {
+  const skipDatabase = process.env.WORDPRESS_SKIP_DB === '1';
+  
+  if (skipDatabase) {
+    log('⏭️ Skipping database wait (WORDPRESS_SKIP_DB=1)', 'yellow');
+    return Promise.resolve();
+  }
+  
   log('Waiting for database to be ready...', 'yellow');
   
   return new Promise((resolve) => {
+    const dbHost = process.env.WORDPRESS_DB_HOST || 'db:3306';
+    const [dbHostName, dbPort] = dbHost.split(':');
+    const dbPortNum = dbPort || '3306';
+    
+    const maxAttempts = 30; // 5 minutes max
+    let attempts = 0;
+    
     const checkInterval = setInterval(() => {
-      const dbHost = process.env.WORDPRESS_DB_HOST || 'db';
-      const result = execCommandSilent(`mysqladmin ping -h"${dbHost}" -P"3306"`);
+      attempts++;
+      const result = execCommandSilent(`mysqladmin ping -h"${dbHostName}" -P"${dbPortNum}"`);
       
       if (result !== null) {
         clearInterval(checkInterval);
         log('Database is ready!', 'green');
         resolve();
+      } else if (attempts >= maxAttempts) {
+        clearInterval(checkInterval);
+        log('Database not available after 5 minutes. Starting WordPress anyway...', 'yellow');
+        resolve();
       }
-    }, 1000);
+    }, 10000); // Check every 10 seconds
   });
 }
 
 function installWordPress() {
+  const skipDatabase = process.env.WORDPRESS_SKIP_DB === '1';
+  
+  if (skipDatabase) {
+    log('⏭️ Skipping WordPress installation (WORDPRESS_SKIP_DB=1)', 'yellow');
+    return;
+  }
+  
   const result = execCommandSilent('wp core is-installed --allow-root');
   
   if (result === null) {
     log('Installing WordPress...', 'cyan');
     
-    const url = process.env.WORDPRESS_URL || 'http://localhost';
+    // Get the port from environment or default to 80
+    const port = process.env.WORDPRESS_PORT || '80';
+    const baseUrl = process.env.WORDPRESS_URL || `http://localhost:${port}`;
     const title = process.env.WORDPRESS_TITLE || 'WordPress Site';
     const adminUser = process.env.WORDPRESS_ADMIN_USER || 'admin';
     const adminPassword = process.env.WORDPRESS_ADMIN_PASSWORD || 'admin';
     const adminEmail = process.env.WORDPRESS_ADMIN_EMAIL || 'admin@example.com';
     
-    execCommand(`wp core install --url="${url}" --title="${title}" --admin_user="${adminUser}" --admin_password="${adminPassword}" --admin_email="${adminEmail}" --allow-root`);
-    
-    log('WordPress installed successfully', 'green');
+    try {
+      execCommand(`wp core install --url="${baseUrl}" --title="${title}" --admin_user="${adminUser}" --admin_password="${adminPassword}" --admin_email="${adminEmail}" --allow-root`);
+      log('WordPress installed successfully', 'green');
+    } catch (error) {
+      log('Warning: Could not install WordPress. Database may not be available.', 'yellow');
+      log('WordPress will show installation page when accessed.', 'yellow');
+    }
   } else {
     log('WordPress is already installed', 'yellow');
   }
@@ -173,18 +189,51 @@ function setPermissions() {
 }
 
 function activatePlugin() {
+  const skipDatabase = process.env.WORDPRESS_SKIP_DB === '1';
+  
+  if (skipDatabase) {
+    log('⏭️ Skipping plugin activation (WORDPRESS_SKIP_DB=1)', 'yellow');
+    return;
+  }
+  
   log('Activating custom REST API plugin...', 'cyan');
   try {
     execCommand('wp plugin activate custom-rest-api --allow-root');
     log('Custom REST API plugin activated', 'green');
   } catch (error) {
-    log('Plugin activation failed (may already be active)', 'yellow');
+    log('Plugin activation failed (may already be active or database not available)', 'yellow');
   }
+}
+
+function configureApache() {
+  const port = process.env.WORDPRESS_PORT || '80';
+  log(`🔧 Configuring Apache for port ${port}...`, 'cyan');
+  
+  // Update ports.conf
+  execCommand(`sed -i 's/Listen 80/Listen ${port}/' /etc/apache2/ports.conf`);
+  
+  // Update virtual host configuration
+  const vhostConfig = `/etc/apache2/sites-available/000-default.conf`;
+  let vhostContent = fs.readFileSync(vhostConfig, 'utf8');
+  
+  // Replace the VirtualHost port
+  vhostContent = vhostContent.replace(
+    /<VirtualHost \*:80>/g,
+    `<VirtualHost *:${port}>`
+  );
+  
+  // Write the updated configuration
+  fs.writeFileSync(vhostConfig, vhostContent);
+  
+  log('Apache configuration updated', 'green');
 }
 
 async function main() {
   try {
-    log('🚀 Starting WordPress...', 'bright');
+    const skipDatabase = process.env.WORDPRESS_SKIP_DB === '1';
+    const mode = skipDatabase ? 'No Database Mode' : 'Full Mode';
+    
+    log(`🚀 Starting WordPress (${mode})...`, 'bright');
     
     // Change to WordPress directory
     process.chdir('/var/www/html');
@@ -192,30 +241,38 @@ async function main() {
     // Create wp-config.php
     createWpConfig();
     
-    // Wait for database
+    // Wait for database (if not skipped)
     await waitForDatabase();
     
-    // Install WordPress if needed
+    // Install WordPress (if not skipped)
     installWordPress();
     
     // Set proper permissions
     setPermissions();
     
-    // Activate our custom plugin
+    // Activate our custom plugin (if not skipped)
     activatePlugin();
+    
+    // Configure Apache
+    configureApache();
+    
+    const port = process.env.WORDPRESS_PORT || '80';
+    const baseUrl = process.env.WORDPRESS_URL || `http://localhost:${port}`;
     
     log('✅ WordPress is ready!', 'green');
     log('\n🌐 Access your applications:', 'bright');
-    log('   WordPress: http://localhost', 'cyan');
-    log('   WordPress Admin: http://localhost/wp-admin', 'cyan');
-    log('   phpMyAdmin: http://localhost:8080', 'cyan');
-    log('   Custom REST API: http://localhost/wp-json/custom-api/v1/health', 'cyan');
+    log(`   WordPress: ${baseUrl}`, 'cyan');
+    log(`   WordPress Admin: ${baseUrl}/wp-admin`, 'cyan');
+    log(`   Custom REST API: ${baseUrl}/wp-json/custom-api/v1/health`, 'cyan');
     
-    // Configure Apache to listen on the correct port
-    const port = process.env.WORDPRESS_PORT || '80';
-    log(`\n🔧 Configuring Apache for port ${port}...`, 'cyan');
-    execCommand(`sed -i "s/Listen 80/Listen ${port}/" /etc/apache2/ports.conf`);
-    execCommand(`sed -i "s/<VirtualHost \\*:80>/<VirtualHost *:${port}>/" /etc/apache2/sites-available/000-default.conf`);
+    if (!skipDatabase) {
+      log('   phpMyAdmin: http://localhost:8080', 'cyan');
+      log('   MySQL Database: localhost:3306', 'cyan');
+    } else {
+      log('\n📝 Note: Running in no-database mode', 'yellow');
+      log('   WordPress will show installation page when accessed', 'yellow');
+      log('   Set WORDPRESS_SKIP_DB=0 to enable database operations', 'yellow');
+    }
     
     // Start Apache
     log('\n🔧 Starting Apache...', 'cyan');
@@ -241,5 +298,6 @@ module.exports = {
   waitForDatabase, 
   installWordPress, 
   setPermissions,
-  activatePlugin 
+  activatePlugin,
+  configureApache
 };

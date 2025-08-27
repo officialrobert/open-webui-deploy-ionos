@@ -1,70 +1,101 @@
-# Universal Dockerfile for WordPress + Custom REST API Plugin (Dev & Prod)
+# Use official PHP Apache image with WordPress
 FROM php:8.2-apache
+
+# Set environment variables
+ENV WORDPRESS_VERSION=6.4.2
+ENV WORDPRESS_PORT=3000
+ENV WORDPRESS_DB_NAME=wordpress
+ENV WORDPRESS_DB_USER=wordpress
+ENV WORDPRESS_DB_PASSWORD=wordpress_password
+ENV WORDPRESS_DB_HOST=db:3306
+ENV WORDPRESS_URL=http://localhost:3000
+ENV WORDPRESS_TITLE="WordPress with Custom REST API"
+ENV WORDPRESS_ADMIN_USER=admin
+ENV WORDPRESS_ADMIN_PASSWORD=admin
+ENV WORDPRESS_ADMIN_EMAIL=admin@example.com
+ENV WORDPRESS_DEBUG=1
+ENV WORDPRESS_SKIP_DB=0
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    libzip-dev \
-    zip \
-    unzip \
+    wget \
     curl \
+    gnupg2 \
+    lsb-release \
+    ca-certificates \
+    apt-transport-https \
+    default-mysql-client \
+    unzip \
     git \
-    nodejs \
-    npm \
-    mariadb-client \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
 # Install PHP extensions
-RUN docker-php-ext-install \
-    mysqli \
-    pdo_mysql \
-    zip \
-    opcache
+RUN docker-php-ext-install mysqli pdo pdo_mysql
 
 # Enable Apache modules
 RUN a2enmod rewrite
 
-# Set working directory
-WORKDIR /var/www/html
+# Download and extract WordPress
+RUN wget -O /tmp/wordpress.tar.gz https://wordpress.org/wordpress-${WORDPRESS_VERSION}.tar.gz \
+    && tar -xzf /tmp/wordpress.tar.gz -C /tmp \
+    && rm /tmp/wordpress.tar.gz
 
-# Copy WordPress files
-COPY . .
+# Copy WordPress files to Apache document root
+RUN cp -r /tmp/wordpress/* /var/www/html/ \
+    && rm -rf /tmp/wordpress
 
-# Build the custom REST API plugin
-WORKDIR /var/www/html/wp-content/plugins/custom-rest-api
+# Copy custom files and scripts
+COPY start-wordpress.js /usr/local/bin/
+COPY package.json /tmp/
+COPY wp-config-sample.php /var/www/html/
 
-# Copy package files and install dependencies
-COPY wp-content/plugins/custom-rest-api/package*.json ./
-COPY wp-content/plugins/custom-rest-api/tsconfig.json ./
+# Copy custom REST API plugin
+COPY wp-content/plugins/custom-rest-api /var/www/html/wp-content/plugins/custom-rest-api/
 
-# Install Node.js dependencies (will be overridden in dev with npm install)
-RUN npm ci --only=production && \
-    npm run build
-
-# Copy plugin source files
-COPY wp-content/plugins/custom-rest-api/src/ ./src/
-
-# Build TypeScript again to ensure all files are compiled
-RUN npm run build
-
-# Return to WordPress root
-WORKDIR /var/www/html
-
-# Set proper permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html
+# Install Node.js dependencies for the custom plugin
+RUN cd /var/www/html/wp-content/plugins/custom-rest-api \
+    && npm install \
+    && npm run build
 
 # Install WP-CLI
-RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && \
-    chmod +x wp-cli.phar && \
-    mv wp-cli.phar /usr/local/bin/wp
+RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+    && chmod +x wp-cli.phar \
+    && mv wp-cli.phar /usr/local/bin/wp
 
-# Copy startup script
-COPY start-wordpress.js /usr/local/bin/start-wordpress.js
-RUN chmod +x /usr/local/bin/start-wordpress.js
+# Create necessary directories and set permissions
+RUN mkdir -p /var/www/html/wp-content/uploads \
+    && mkdir -p /var/www/html/wp-content/cache \
+    && chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html
 
-# Expose ports for all apps (will be configured by startup script)
-EXPOSE 3000 3001 3002
+# Configure Apache for port 3000
+RUN sed -i "s/Listen 80/Listen ${WORDPRESS_PORT}/" /etc/apache2/ports.conf \
+    && sed -i "s/<VirtualHost \*:80>/<VirtualHost *:${WORDPRESS_PORT}>/" /etc/apache2/sites-available/000-default.conf \
+    && sed -i "s/<\/VirtualHost>/<\/VirtualHost>/" /etc/apache2/sites-available/000-default.conf
 
+# Add .htaccess for WordPress
+RUN echo 'RewriteEngine On' > /var/www/html/.htaccess \
+    && echo 'RewriteBase /' >> /var/www/html/.htaccess \
+    && echo 'RewriteRule ^index\.php$ - [L]' >> /var/www/html/.htaccess \
+    && echo 'RewriteCond %{REQUEST_FILENAME} !-f' >> /var/www/html/.htaccess \
+    && echo 'RewriteCond %{REQUEST_FILENAME} !-d' >> /var/www/html/.htaccess \
+    && echo 'RewriteRule . /index.php [L]' >> /var/www/html/.htaccess
 
-# Start WordPress
-CMD ["node", "/usr/local/bin/start-wordpress.js"]
+# Create a health check script
+RUN echo '#!/bin/bash' > /usr/local/bin/healthcheck.sh \
+    && echo 'curl -f http://localhost:${WORDPRESS_PORT}/wp-json/ || exit 1' >> /usr/local/bin/healthcheck.sh \
+    && chmod +x /usr/local/bin/healthcheck.sh
+
+# Expose port 3000
+EXPOSE 3000
+
+# Set the entrypoint to our unified startup script
+ENTRYPOINT ["node", "/usr/local/bin/start-wordpress.js"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD /usr/local/bin/healthcheck.sh
