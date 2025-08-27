@@ -15,13 +15,18 @@
     "watch:plugin": "cd wp-content/plugins/custom-rest-api && npm run watch",
     "install:plugin": "cd wp-content/plugins/custom-rest-api && npm install",
     "status": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' ps', { stdio: 'inherit' })\"",
-    "shell:wordpress": "node -e \"const { getDockerCommand, isWindows } = require('./scripts/start.js'); const cmd = getDockerCommand(); const shell = isWindows() ? 'powershell' : 'bash'; require('child_process').execSync(cmd + ' exec wordpress ' + shell, { stdio: 'inherit' })\"",
+    "shell:app_a": "node -e \"const { getDockerCommand, isWindows } = require('./scripts/start.js'); const cmd = getDockerCommand(); const shell = isWindows() ? 'powershell' : 'bash'; require('child_process').execSync(cmd + ' exec app_a ' + shell, { stdio: 'inherit' })\"",
+    "shell:app_b": "node -e \"const { getDockerCommand, isWindows } = require('./scripts/start.js'); const cmd = getDockerCommand(); const shell = isWindows() ? 'powershell' : 'bash'; require('child_process').execSync(cmd + ' exec app_b ' + shell, { stdio: 'inherit' })\"",
+    "shell:app_c": "node -e \"const { getDockerCommand, isWindows } = require('./scripts/start.js'); const cmd = getDockerCommand(); const shell = isWindows() ? 'powershell' : 'bash'; require('child_process').execSync(cmd + ' exec app_c ' + shell, { stdio: 'inherit' })\"",
     "db:shell": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' exec db mysql -u wordpress -pwordpress_password', { stdio: 'inherit' })\"",
-    "logs:wordpress": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs wordpress', { stdio: 'inherit' })\"",
+    "logs:app_a": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs app_a', { stdio: 'inherit' })\"",
+    "logs:app_b": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs app_b', { stdio: 'inherit' })\"",
+    "logs:app_c": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs app_c', { stdio: 'inherit' })\"",
     "logs:db": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs db', { stdio: 'inherit' })\"",
     "clean:all": "docker system prune -f && docker volume prune -f",
     "reset": "npm run start:clean && npm start",
-    "help": "node scripts/start.js --help"
+    "help": "node scripts/start.js --help",
+    "test:table-prefix": "node -e \"const { createWpConfig } = require('./start-wordpress.js'); process.env.WORDPRESS_INSTANCE = 'app_a'; process.env.WORDPRESS_TABLE_PREFIX = 'wp_a_'; process.env.WORDPRESS_DB_NAME = 'wordpress'; process.env.WORDPRESS_DB_USER = 'wordpress'; process.env.WORDPRESS_DB_PASSWORD = 'wordpress_password'; process.env.WORDPRESS_DB_HOST = 'db:3306'; process.env.WORDPRESS_URL = 'http://localhost:3001'; process.env.WORDPRESS_DEBUG = '1'; console.log('Testing table prefix functionality...');\""
   },
   "keywords": [
     "wordpress",

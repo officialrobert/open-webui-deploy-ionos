@@ -3,12 +3,10 @@ FROM php:8.2-apache
 
 # Set environment variables
 ENV WORDPRESS_VERSION=6.4.2
-ENV WORDPRESS_PORT=3000
 ENV WORDPRESS_DB_NAME=wordpress
 ENV WORDPRESS_DB_USER=wordpress
 ENV WORDPRESS_DB_PASSWORD=wordpress_password
 ENV WORDPRESS_DB_HOST=db:3306
-ENV WORDPRESS_URL=http://localhost:3000
 ENV WORDPRESS_TITLE="WordPress with Custom REST API"
 ENV WORDPRESS_ADMIN_USER=admin
 ENV WORDPRESS_ADMIN_PASSWORD=admin
@@ -27,10 +25,15 @@ RUN apt-get update && apt-get install -y \
     default-mysql-client \
     unzip \
     git \
+    netcat-openbsd \
+    iputils-ping \
+    dnsutils \
+    telnet \
+    coreutils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js and npm
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+# Install Node.js 20 and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs
 
 # Install PHP extensions
@@ -50,8 +53,11 @@ RUN cp -r /tmp/wordpress/* /var/www/html/ \
 
 # Copy custom files and scripts
 COPY start-wordpress.js /usr/local/bin/
-COPY package.json /tmp/
+COPY package.json /usr/local/bin/
 COPY wp-config-sample.php /var/www/html/
+
+# Install Node.js dependencies for the main application
+RUN cd /usr/local/bin && npm install
 
 # Copy custom REST API plugin
 COPY wp-content/plugins/custom-rest-api /var/www/html/wp-content/plugins/custom-rest-api/
@@ -73,9 +79,9 @@ RUN mkdir -p /var/www/html/wp-content/uploads \
     && chmod -R 755 /var/www/html
 
 # Configure Apache for port 3000
-RUN sed -i "s/Listen 80/Listen ${WORDPRESS_PORT}/" /etc/apache2/ports.conf \
-    && sed -i "s/<VirtualHost \*:80>/<VirtualHost *:${WORDPRESS_PORT}>/" /etc/apache2/sites-available/000-default.conf \
-    && sed -i "s/<\/VirtualHost>/<\/VirtualHost>/" /etc/apache2/sites-available/000-default.conf
+RUN sed -i "s/Listen 80/Listen 0.0.0.0:3000/" /etc/apache2/ports.conf \
+    && sed -i "s/<VirtualHost \*:80>/<VirtualHost *:3000>/" /etc/apache2/sites-available/000-default.conf \
+    && echo "ServerName localhost" >> /etc/apache2/sites-available/000-default.conf
 
 # Add .htaccess for WordPress
 RUN echo 'RewriteEngine On' > /var/www/html/.htaccess \
@@ -87,7 +93,7 @@ RUN echo 'RewriteEngine On' > /var/www/html/.htaccess \
 
 # Create a health check script
 RUN echo '#!/bin/bash' > /usr/local/bin/healthcheck.sh \
-    && echo 'curl -f http://localhost:${WORDPRESS_PORT}/wp-json/ || exit 1' >> /usr/local/bin/healthcheck.sh \
+    && echo 'curl -f http://127.0.0.1:3000/wp-json/ || exit 1' >> /usr/local/bin/healthcheck.sh \
     && chmod +x /usr/local/bin/healthcheck.sh
 
 # Expose port 3000

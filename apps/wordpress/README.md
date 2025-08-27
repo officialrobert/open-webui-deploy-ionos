@@ -4,27 +4,19 @@ This project provides a complete Docker setup for running WordPress with a custo
 
 ## 🏗️ Architecture
 
-- **WordPress Apps**: 3 separate WordPress instances (App A, App B, App C)
+- **WordPress Applications**: 3 separate WordPress instances (App A, App B, App C) with custom REST API
 - **Custom REST API Plugin**: TypeScript-based plugin with Node.js-like functionality
-- **Database**: MySQL 8.0 (shared across all apps)
-
-- **Development Tools**: Hot reloading, TypeScript compilation, debugging
-- **Production**: Optimized builds, performance tuning
+- **Database**: MySQL 8.0 (shared across all apps) with phpMyAdmin for management
 
 ## 📁 Project Structure
 
 ```
 apps/wordpress/
-├── Dockerfile                    # Production Dockerfile
-├── Dockerfile.dev               # Development Dockerfile
-├── docker-compose.yml           # Production docker-compose (3 apps)
-├── docker-compose.dev.yml       # Development docker-compose (3 apps)
-
+├── Dockerfile                    # WordPress Dockerfile
+├── docker-compose.yml           # Full stack (WordPress + MySQL + phpMyAdmin)
 ├── .dockerignore                # Docker ignore rules
 ├── scripts/
-│   ├── dev.js                   # Development startup script
-│   ├── prod.js                  # Production startup script
-│   └── test-api.js              # API testing script
+│   └── start.js                 # Unified startup script
 ├── wp-content/
 │   └── plugins/
 │       └── custom-rest-api/     # Custom REST API plugin
@@ -36,80 +28,58 @@ apps/wordpress/
 ### Prerequisites
 
 - Docker and Docker Compose installed
+- Node.js (for running the startup script)
 - Git (for cloning the repository)
 
-### 1. Development Environment
+### Start the Application
 
 ```bash
 # Navigate to the wordpress directory
 cd apps/wordpress
 
-# Make scripts executable
-chmod +x scripts/*.sh
-
-# Start development environment
-./scripts/dev.sh
+# Start the full stack (WordPress + MySQL + phpMyAdmin)
+npm start
 ```
 
-**Development Features:**
-- ✅ Hot reloading for TypeScript changes
-- ✅ WordPress debug mode enabled
-- ✅ Source code mounted for live editing
-- ✅ Development tools container
+**Features:**
+- ✅ 3 WordPress apps with custom REST API plugin
+- ✅ Shared MySQL 8.0 database with fresh installation on each start
 - ✅ phpMyAdmin for database management
+- ✅ Cross-platform compatibility (Windows, Linux, macOS)
+- ✅ Automatic container management
+- ✅ Health checks and API testing
+- ✅ Load balancer ready (ports 3001, 3002, 3003)
 
-### 2. Production Environment
+### Start the Application
 
 ```bash
-# Navigate to the wordpress directory
-cd apps/wordpress
-
-# Start production environment
-npm run prod
+# Start the full stack (WordPress + MySQL + phpMyAdmin)
+npm start
 ```
-
-**Production Features:**
-- ✅ Optimized for performance
-- ✅ Debug mode disabled
-- ✅ Pre-compiled TypeScript
-- ✅ Security hardened
-- ✅ Production-ready configuration
 
 
 
 ## 🔧 Manual Docker Commands
 
-### Development
+### Full Stack (Recommended)
 
 ```bash
-# Build and start development environment
-docker-compose -f docker-compose.dev.yml up --build
-
-# Start in background
-docker-compose -f docker-compose.dev.yml up -d
-
-# View logs
-docker-compose -f docker-compose.dev.yml logs -f wordpress
-
-# Stop development environment
-docker-compose -f docker-compose.dev.yml down
-```
-
-### Production
-
-```bash
-# Build and start production environment
+# Build and start full stack environment
 docker-compose up --build
 
 # Start in background
 docker-compose up -d
 
-# View logs
-docker-compose logs -f wordpress
+# View logs for specific apps
+docker-compose logs -f app_a
+docker-compose logs -f app_b
+docker-compose logs -f app_c
 
-# Stop production environment
+# Stop environment
 docker-compose down
 ```
+
+
 
 ## 🧪 Testing the API
 
@@ -117,81 +87,119 @@ docker-compose down
 
 ```bash
 # Run the test script
-./scripts/test-api.sh
+npm run test-api
 ```
+
+### Testing Table Prefix Configuration
+
+Each WordPress instance uses a unique table prefix to avoid conflicts in the shared database:
+
+- **App A**: `wp_a_` (port 3001)
+- **App B**: `wp_b_` (port 3002)  
+- **App C**: `wp_c_` (port 3003)
+
+**Note**: The application performs a fresh installation on each start, dropping and recreating all tables for each instance. This ensures a clean slate every time you start the application.
+
+To verify the table prefixes are working correctly:
+
+```bash
+# Check database tables after startup
+docker-compose exec db mysql -u wordpress -pwordpress_password -e "SHOW TABLES;" wordpress
+
+# You should see tables like:
+# wp_a_posts, wp_a_users, wp_a_options (for App A)
+# wp_b_posts, wp_b_users, wp_b_options (for App B)
+# wp_c_posts, wp_c_users, wp_c_options (for App C)
+```
+
+### Preventing Redirect Issues
+
+If you experience redirects between instances (e.g., accessing port 3002 redirects to 3001):
+
+1. **Clear browser cache and cookies**
+2. **Use incognito/private browsing mode**
+3. **Check for browser extensions causing redirects**
+4. **Verify each instance has correct site URL**:
+   ```bash
+   # Check site URLs in database
+   docker-compose exec db mysql -u wordpress -pwordpress_password -e "SELECT option_name, option_value FROM wp_a_options WHERE option_name IN ('home', 'siteurl');" wordpress
+   docker-compose exec db mysql -u wordpress -pwordpress_password -e "SELECT option_name, option_value FROM wp_b_options WHERE option_name IN ('home', 'siteurl');" wordpress
+   docker-compose exec db mysql -u wordpress -pwordpress_password -e "SELECT option_name, option_value FROM wp_c_options WHERE option_name IN ('home', 'siteurl');" wordpress
+   ```
 
 ### Manual Testing
 
 ```bash
-# Health check
-curl http://localhost/wp-json/custom-api/v1/health
+# Health check for all apps
+curl http://localhost:3001/wp-json/custom-api/v1/health
+curl http://localhost:3002/wp-json/custom-api/v1/health
+curl http://localhost:3003/wp-json/custom-api/v1/health
 
-# Get posts
-curl http://localhost/wp-json/custom-api/v1/posts
+# Get posts from all apps
+curl http://localhost:3001/wp-json/custom-api/v1/posts
+curl http://localhost:3002/wp-json/custom-api/v1/posts
+curl http://localhost:3003/wp-json/custom-api/v1/posts
 
-# Get users
-curl http://localhost/wp-json/custom-api/v1/users
+# Get users from all apps
+curl http://localhost:3001/wp-json/custom-api/v1/users
+curl http://localhost:3002/wp-json/custom-api/v1/users
+curl http://localhost:3003/wp-json/custom-api/v1/users
 
-# Get Node.js-like data
-curl http://localhost/wp-json/custom-api/v1/node-data
+# Get Node.js-like data from all apps
+curl http://localhost:3001/wp-json/custom-api/v1/node-data
+curl http://localhost:3002/wp-json/custom-api/v1/node-data
+curl http://localhost:3003/wp-json/custom-api/v1/node-data
 ```
 
 ## 🌐 Access Points
 
 Once the environment is running, you can access:
 
-### Development Environment
-- **App A - WordPress**: http://localhost:3000
-- **App A - Admin**: http://localhost:3000/wp-admin
-- **App B - WordPress**: http://localhost:3001
-- **App B - Admin**: http://localhost:3001/wp-admin
-- **App C - WordPress**: http://localhost:3002
-- **App C - Admin**: http://localhost:3002/wp-admin
-- **phpMyAdmin**: http://localhost:8080
-- **App A - REST API**: http://localhost:3000/wp-json/custom-api/v1/health
-- **App B - REST API**: http://localhost:3001/wp-json/custom-api/v1/health
-- **App C - REST API**: http://localhost:3002/wp-json/custom-api/v1/health
+### Full Stack Environment
+- **App A - WordPress**: http://localhost:3001
+- **App A - Admin**: http://localhost:3001/wp-admin
+- **App A - REST API**: http://localhost:3001/wp-json/custom-api/v1/health
+- **App B - WordPress**: http://localhost:3002
+- **App B - Admin**: http://localhost:3002/wp-admin
+- **App B - REST API**: http://localhost:3002/wp-json/custom-api/v1/health
+- **App C - WordPress**: http://localhost:3003
+- **App C - Admin**: http://localhost:3003/wp-admin
+- **App C - REST API**: http://localhost:3003/wp-json/custom-api/v1/health
+- **phpMyAdmin**: http://localhost:8081
+- **MySQL Database**: localhost:3306
 
-### Production Environment
-- **App A - WordPress**: http://localhost:3000
-- **App A - Admin**: http://localhost:3000/wp-admin
-- **App B - WordPress**: http://localhost:3001
-- **App B - Admin**: http://localhost:3001/wp-admin
-- **App C - WordPress**: http://localhost:3002
-- **App C - Admin**: http://localhost:3002/wp-admin
-- **phpMyAdmin**: http://localhost:8080
-- **App A - REST API**: http://localhost:3000/wp-json/custom-api/v1/health
-- **App B - REST API**: http://localhost:3001/wp-json/custom-api/v1/health
-- **App C - REST API**: http://localhost:3002/wp-json/custom-api/v1/health
+
 
 
 
 ## 🔧 Development Workflow
 
-### 1. Start Development Environment
+### 1. Start the Application
 
 ```bash
-./scripts/dev.sh
+npm start
 ```
 
 ### 2. Edit Plugin Code
 
-The plugin source is mounted for hot reloading:
+The plugin source is available for editing:
 - Edit `wp-content/plugins/custom-rest-api/src/api.ts`
-- Changes are automatically compiled
+- Rebuild the plugin if needed
 - Refresh browser to see changes
 
 ### 3. Test Changes
 
 ```bash
-# Test API endpoints
-./scripts/test-api.sh
+# Test API endpoints for all apps
+npm run test-api
 
 # Or manually test in browser
-curl http://localhost/wp-json/custom-api/v1/health
+curl http://localhost:3001/wp-json/custom-api/v1/health
+curl http://localhost:3002/wp-json/custom-api/v1/health
+curl http://localhost:3003/wp-json/custom-api/v1/health
 ```
 
-### 4. Build for Production
+### 4. Build Plugin
 
 ```bash
 # Navigate to plugin directory
@@ -203,31 +211,32 @@ npm run build
 
 ## 🐳 Docker Configuration Details
 
-### Development vs Production
-
-| Feature | Development | Production |
-|---------|-------------|------------|
-| Debug Mode | ✅ Enabled | ❌ Disabled |
-| Hot Reloading | ✅ Enabled | ❌ Disabled |
-| Source Mounts | ✅ Enabled | ❌ Disabled |
-| TypeScript Watch | ✅ Enabled | ❌ Pre-compiled |
-| Performance | Standard | Optimized |
-| Security | Development | Hardened |
-
 ### Environment Variables
 
-**Development:**
 ```yaml
+# WordPress Configuration (for each app)
+WORDPRESS_DB_HOST: db:3306
+WORDPRESS_DB_NAME: wordpress
+WORDPRESS_DB_USER: wordpress
+WORDPRESS_DB_PASSWORD: wordpress_password
+WORDPRESS_URL: http://localhost:3001 (App A), 3002 (App B), 3003 (App C)
+WORDPRESS_TITLE: "WordPress App X - Custom REST API"
+WORDPRESS_ADMIN_USER: admin
+WORDPRESS_ADMIN_PASSWORD: admin
+WORDPRESS_ADMIN_EMAIL: admin@example.com
 WORDPRESS_DEBUG: 1
-WP_DEBUG: true
-WP_DEBUG_LOG: true
-```
 
-**Production:**
-```yaml
-WORDPRESS_DEBUG: 0
-WP_DEBUG: false
-WP_DEBUG_LOG: false
+# MySQL Configuration
+MYSQL_ROOT_PASSWORD: rootpassword
+MYSQL_DATABASE: wordpress
+MYSQL_USER: wordpress
+MYSQL_PASSWORD: wordpress_password
+
+# phpMyAdmin Configuration
+PMA_HOST: db
+PMA_PORT: 3306
+PMA_USER: wordpress
+PMA_PASSWORD: wordpress_password
 ```
 
 ## 🔍 Troubleshooting
@@ -270,6 +279,21 @@ WP_DEBUG_LOG: false
    chmod -R 755 .
    ```
 
+5. **Table Prefix Issues**
+   ```bash
+   # Check if table prefixes are working
+   docker-compose exec db mysql -u wordpress -pwordpress_password -e "SHOW TABLES;" wordpress
+   
+   # If tables are not separated, restart the containers
+   docker-compose down
+   docker-compose up -d
+   
+   # Check the wp-config.php in each container
+   docker-compose exec app_a cat /var/www/html/wp-config.php | grep table_prefix
+   docker-compose exec app_b cat /var/www/html/wp-config.php | grep table_prefix
+   docker-compose exec app_c cat /var/www/html/wp-config.php | grep table_prefix
+   ```
+
 ### Debug Mode
 
 **Enable WordPress Debug:**
@@ -298,8 +322,10 @@ docker exec -it wordpress cat /var/www/html/wp-content/debug.log
 # Check all services
 docker-compose ps
 
-# Check service health
-docker-compose exec wordpress curl -f http://localhost/wp-json/custom-api/v1/health
+# Check service health for all apps
+docker-compose exec app_a curl -f http://localhost/wp-json/custom-api/v1/health
+docker-compose exec app_b curl -f http://localhost/wp-json/custom-api/v1/health
+docker-compose exec app_c curl -f http://localhost/wp-json/custom-api/v1/health
 
 # Monitor logs
 docker-compose logs -f
@@ -311,8 +337,10 @@ docker-compose logs -f
 # Check container resource usage
 docker stats
 
-# Check WordPress performance
-curl -w "@curl-format.txt" -o /dev/null -s http://localhost/wp-json/custom-api/v1/health
+# Check WordPress performance for all apps
+curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3001/wp-json/custom-api/v1/health
+curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3002/wp-json/custom-api/v1/health
+curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3003/wp-json/custom-api/v1/health
 ```
 
 ## 🔒 Security
@@ -333,34 +361,38 @@ curl -w "@curl-format.txt" -o /dev/null -s http://localhost/wp-json/custom-api/v
 
 ## 🚀 Deployment
 
-### Local Production Build
+### Local Build
 
 ```bash
-# Build production image
+# Build image
 docker-compose build
 
-# Start production environment
+# Start environment
 docker-compose up -d
 
 # Verify deployment
-./scripts/test-api.sh
+npm run test-api
 ```
 
 ### Production Deployment
 
-1. **Build Production Image:**
+1. **Build Images:**
    ```bash
-   docker-compose build wordpress
+   docker-compose build app_a app_b app_c
    ```
 
 2. **Tag for Registry:**
    ```bash
-   docker tag wordpress:latest your-registry/wordpress:latest
+   docker tag wordpress-app-a:latest your-registry/wordpress-app-a:latest
+   docker tag wordpress-app-b:latest your-registry/wordpress-app-b:latest
+   docker tag wordpress-app-c:latest your-registry/wordpress-app-c:latest
    ```
 
 3. **Push to Registry:**
    ```bash
-   docker push your-registry/wordpress:latest
+   docker push your-registry/wordpress-app-a:latest
+   docker push your-registry/wordpress-app-b:latest
+   docker push your-registry/wordpress-app-c:latest
    ```
 
 4. **Deploy:**
@@ -395,7 +427,7 @@ docker-compose up -d
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test with `./scripts/test-api.sh`
+4. Test with `npm run test-api`
 5. Submit a pull request
 
 ## 📄 License
@@ -408,6 +440,6 @@ For support and questions:
 
 1. Check the troubleshooting section
 2. Review Docker logs: `docker-compose logs`
-3. Test API endpoints: `./scripts/test-api.sh`
+3. Test API endpoints: `npm run test-api`
 4. Check WordPress debug logs
 

@@ -99,15 +99,24 @@ function checkDocker() {
 function stopRunningInstances() {
   log('🔄 Checking for running instances...', 'cyan');
 
-  // Stop and remove any running wordpress-app container
-  const wordpressContainer = execCommandSilent(
-    'docker ps -q -f name=wordpress-app',
-  );
-  if (wordpressContainer) {
-    log('🛑 Stopping existing wordpress-app container...', 'yellow');
-    execCommandSilent('docker stop wordpress-app');
-    execCommandSilent('docker rm wordpress-app');
-    log('✅ wordpress-app container stopped and removed', 'green');
+  // Stop and remove any running wordpress-app containers
+  const appContainers = [
+    'wordpress-app',
+    'wordpress-app-a',
+    'wordpress-app-b',
+    'wordpress-app-c',
+  ];
+
+  for (const containerName of appContainers) {
+    const container = execCommandSilent(
+      `docker ps -q -f name=${containerName}`,
+    );
+    if (container) {
+      log(`🛑 Stopping existing ${containerName} container...`, 'yellow');
+      execCommandSilent(`docker stop ${containerName}`);
+      execCommandSilent(`docker rm ${containerName}`);
+      log(`✅ ${containerName} container stopped and removed`, 'green');
+    }
   }
 
   // Stop and remove any running wordpress-db container
@@ -143,91 +152,30 @@ function stopRunningInstances() {
     // docker-compose.yml might not exist, which is fine
   }
 
-  // Check if port 3000 is in use (cross-platform)
-  try {
-    const portCheckCommand = getPortCheckCommand(3000);
-    execSync(portCheckCommand, { stdio: 'pipe' });
-    log(
-      '⚠️  Port 3000 is still in use. You may need to manually stop the process using it.',
-      'yellow',
-    );
-  } catch (error) {
-    // Port 3000 is free, which is good
+  // Check if ports 3001, 3002, 3003 are in use (cross-platform)
+  const ports = [3001, 3002, 3003];
+  for (const port of ports) {
+    try {
+      const portCheckCommand = getPortCheckCommand(port);
+      execSync(portCheckCommand, { stdio: 'pipe' });
+      log(
+        `⚠️  Port ${port} is still in use. You may need to manually stop the process using it.`,
+        'yellow',
+      );
+    } catch (error) {
+      // Port is free, which is good
+    }
   }
 
   log('✅ All running instances stopped', 'green');
 }
 
-function getRunMode() {
-  const args = process.argv.slice(2);
-  const runMode = args.find((arg) => arg.startsWith('--mode='))?.split('=')[1];
-
-  if (runMode === 'docker-run') {
-    return 'docker-run';
-  } else if (runMode === 'compose') {
-    return 'compose';
-  } else if (runMode === 'full-stack') {
-    return 'full-stack';
-  } else {
-    // Default to full-stack if no mode specified
-    return 'full-stack';
-  }
-}
-
-function buildDockerImage() {
-  log('📦 Building WordPress Docker image...', 'cyan');
-  execCommand('docker build -t wordpress-app .');
-  log('✅ Docker image built successfully', 'green');
-}
-
-function runDockerContainer() {
-  log('🚀 Starting WordPress container...', 'cyan');
-
-  // Check if container is already running
-  const existingContainer = execCommandSilent(
-    'docker ps -q -f name=wordpress-app',
-  );
-  if (existingContainer) {
-    log('🔄 Stopping existing container...', 'yellow');
-    execCommand('docker stop wordpress-app');
-    execCommand('docker rm wordpress-app');
-  }
-
-  // Run the container with port 3000
-  const dockerRunCommand = [
-    'docker run -d',
-    '--name wordpress-app',
-    '-p 3000:3000',
-    '-e WORDPRESS_PORT=3000',
-    '-e WORDPRESS_DB_HOST=host.docker.internal:3306',
-    '-e WORDPRESS_DB_NAME=wordpress',
-    '-e WORDPRESS_DB_USER=wordpress',
-    '-e WORDPRESS_DB_PASSWORD=wordpress_password',
-    '-e WORDPRESS_URL=http://localhost:3000',
-    '-e WORDPRESS_TITLE="WordPress Application"',
-    '-e WORDPRESS_ADMIN_USER=admin',
-    '-e WORDPRESS_ADMIN_PASSWORD=admin',
-    '-e WORDPRESS_ADMIN_EMAIL=admin@example.com',
-    '-e WORDPRESS_DEBUG=1',
-    'wordpress-app',
-  ].join(' ');
-
-  execCommand(dockerRunCommand);
-  log('✅ WordPress container started', 'green');
-}
-
-function runDockerCompose() {
-  const dockerCompose = getDockerCommand();
-  log('📦 Building containers...', 'cyan');
-  execCommand(`${dockerCompose} -f docker-compose.dev.yml build`);
-
-  log('🔧 Starting services...', 'cyan');
-  execCommand(`${dockerCompose} -f docker-compose.dev.yml up -d`);
-}
-
 function runFullStack() {
   const dockerCompose = getDockerCommand();
-  log('📦 Building full stack (WordPress + MySQL + phpMyAdmin)...', 'cyan');
+  log(
+    '📦 Building full stack (3 WordPress Apps + MySQL + phpMyAdmin)...',
+    'cyan',
+  );
   execCommand(`${dockerCompose} build --no-cache`);
 
   log('🔧 Starting all services...', 'cyan');
@@ -235,105 +183,110 @@ function runFullStack() {
 }
 
 function waitForWordPress() {
-  log('⏳ Waiting for WordPress to be ready...', 'yellow');
+  log('⏳ Waiting for all WordPress apps to be ready...', 'yellow');
 
   return new Promise((resolve) => {
     const maxAttempts = 30; // 5 minutes max
     let attempts = 0;
+    const ports = [3001, 3002, 3003];
+    const readyApps = new Set();
 
     const checkInterval = setInterval(async () => {
       attempts++;
       try {
         log(
-          `🔍 Attempt ${attempts}/${maxAttempts}: Checking if WordPress is ready...`,
+          `🔍 Attempt ${attempts}/${maxAttempts}: Checking if WordPress apps are ready...`,
           'cyan',
         );
-        const response = await axios.get('http://localhost:3000', {
-          timeout: 5000,
-          validateStatus: () => true, // Accept any status code
-        });
 
-        if (response.status >= 200 && response.status < 500) {
+        for (const port of ports) {
+          if (!readyApps.has(port)) {
+            try {
+              const response = await axios.get(`http://localhost:${port}`, {
+                timeout: 5000,
+                validateStatus: () => true, // Accept any status code
+              });
+
+              if (response.status >= 200 && response.status < 500) {
+                readyApps.add(port);
+                log(`✅ WordPress App on port ${port} is ready!`, 'green');
+              }
+            } catch (error) {
+              console.log(error?.message);
+              // App not ready yet, continue checking
+            }
+          }
+        }
+
+        if (readyApps.size === ports.length) {
           clearInterval(checkInterval);
-          log('✅ WordPress is ready on port 3000!', 'green');
+          log('✅ All WordPress apps are ready!', 'green');
           resolve();
         } else {
           log(
-            `⚠️  WordPress responded with status ${response.status}, continuing to wait...`,
+            `⏳ ${readyApps.size}/${ports.length} apps ready (attempt ${attempts}/${maxAttempts})`,
             'yellow',
           );
         }
       } catch (error) {
         if (attempts >= maxAttempts) {
           clearInterval(checkInterval);
-          log(
-            '❌ WordPress failed to start on port 3000 after 30 attempts',
-            'red',
-          );
+          log('❌ WordPress apps failed to start after 30 attempts', 'red');
           log(`Last error: ${error.message}`, 'red');
           process.exit(1);
         }
-
-        // Continue waiting
-        log(
-          `⏳ WordPress not ready yet (attempt ${attempts}/${maxAttempts})`,
-          'yellow',
-        );
       }
     }, 10000); // Check every 10 seconds
   });
 }
 
 function displayAccessInfo() {
-  const runMode = getRunMode();
+  log('\n🌐 Access your WordPress applications:', 'bright');
 
-  log('\n🌐 Access your WordPress application:', 'bright');
-  log('   WordPress: http://localhost:3000', 'cyan');
-  log('   WordPress Admin: http://localhost:3000/wp-admin', 'cyan');
+  log('   App A - WordPress: http://localhost:3001', 'cyan');
+  log('   App A - Admin: http://localhost:3001/wp-admin', 'cyan');
   log(
-    '   Custom REST API: http://localhost:3000/wp-json/custom-api/v1/health',
+    '   App A - REST API: http://localhost:3001/wp-json/custom-api/v1/health',
     'cyan',
   );
 
-  if (runMode === 'full-stack') {
-    log('   phpMyAdmin: http://localhost:8081', 'cyan');
-    log('   MySQL Database: localhost:3306', 'cyan');
-  }
+  log('   App B - WordPress: http://localhost:3002', 'cyan');
+  log('   App B - Admin: http://localhost:3002/wp-admin', 'cyan');
+  log(
+    '   App B - REST API: http://localhost:3002/wp-json/custom-api/v1/health',
+    'cyan',
+  );
+
+  log('   App C - WordPress: http://localhost:3003', 'cyan');
+  log('   App C - Admin: http://localhost:3003/wp-admin', 'cyan');
+  log(
+    '   App C - REST API: http://localhost:3003/wp-json/custom-api/v1/health',
+    'cyan',
+  );
+
+  log('   phpMyAdmin: http://localhost:8081', 'cyan');
+  log('   MySQL Database: localhost:3306', 'cyan');
 
   log('\n📝 Application info:', 'bright');
   log('   - WordPress debug mode is enabled', 'yellow');
-  if (runMode === 'full-stack') {
-    log('   - Full stack with MySQL and phpMyAdmin', 'yellow');
-    log('   - Logs: docker-compose logs wordpress', 'yellow');
-  } else {
-    log('   - Container name: wordpress-app', 'yellow');
-    log('   - Logs: docker logs wordpress-app', 'yellow');
-  }
+  log('   - Multi-app stack with MySQL and phpMyAdmin', 'yellow');
+  log('   - All apps share the same database', 'yellow');
+  log('   - Logs: docker-compose logs app_a', 'yellow');
+  log('   - Logs: docker-compose logs app_b', 'yellow');
+  log('   - Logs: docker-compose logs app_c', 'yellow');
 
   log('\n🛑 Press Ctrl+C to stop the application', 'magenta');
 }
 
 function cleanup() {
-  const runMode = getRunMode();
   const dockerCompose = getDockerCommand();
 
   log('\n🛑 Stopping application...', 'yellow');
   try {
-    if (runMode === 'docker-run') {
-      execSync('docker stop wordpress-app', { stdio: 'inherit' });
-      execSync('docker rm wordpress-app', { stdio: 'inherit' });
-      log('✅ WordPress container stopped and removed', 'green');
-    } else if (runMode === 'compose') {
-      execSync(`${dockerCompose} -f docker-compose.dev.yml down`, {
-        stdio: 'inherit',
-      });
-      log('✅ Application stopped', 'green');
-    } else if (runMode === 'full-stack') {
-      execSync(`${dockerCompose} down`, {
-        stdio: 'inherit',
-      });
-      log('✅ Full stack environment stopped', 'green');
-    }
+    execSync(`${dockerCompose} down`, {
+      stdio: 'inherit',
+    });
+    log('✅ Full stack environment stopped', 'green');
   } catch (error) {
     log('❌ Error stopping application', 'red');
   }
@@ -358,28 +311,40 @@ async function makeRequest(url) {
 }
 
 async function checkWordPress() {
-  log('🔍 Checking if WordPress is running...', 'cyan');
+  log('🔍 Checking if WordPress apps are running...', 'cyan');
 
-  try {
-    const response = await axios.get('http://localhost:3000', {
-      timeout: 5000,
-      validateStatus: () => true, // Accept any status code
-    });
+  const ports = [3001, 3002, 3003];
+  let runningApps = 0;
 
-    if (response.status >= 200 && response.status < 500) {
-      log('✅ WordPress is running on port 3000', 'green');
-      return true;
-    } else {
-      log(
-        `❌ WordPress is responding but with status ${response.status}`,
-        'red',
-      );
-      log('   Please start the application first with: npm start', 'yellow');
-      return false;
+  for (const port of ports) {
+    try {
+      const response = await axios.get(`http://localhost:${port}`, {
+        timeout: 5000,
+        validateStatus: () => true, // Accept any status code
+      });
+
+      if (response.status >= 200 && response.status < 500) {
+        log(`✅ WordPress App on port ${port} is running`, 'green');
+        runningApps++;
+      } else {
+        log(
+          `❌ WordPress App on port ${port} is responding but with status ${response.status}`,
+          'red',
+        );
+      }
+    } catch (error) {
+      log(`❌ WordPress App on port ${port} is not running`, 'red');
     }
-  } catch (error) {
-    log('❌ WordPress is not running on port 3000', 'red');
-    log(`   Error: ${error.message}`, 'red');
+  }
+
+  if (runningApps === ports.length) {
+    log('✅ All WordPress apps are running', 'green');
+    return true;
+  } else {
+    log(
+      `❌ Only ${runningApps}/${ports.length} WordPress apps are running`,
+      'red',
+    );
     log('   Please start the application first with: npm start', 'yellow');
     return false;
   }
@@ -409,29 +374,35 @@ async function testEndpoint(name, url) {
 async function testAPI() {
   log('🧪 Testing Custom REST API Plugin...', 'bright');
 
-  // Check if WordPress is running
+  // Check if WordPress apps are running
   if (!(await checkWordPress())) {
     process.exit(1);
   }
 
-  const baseUrl = 'http://localhost:3000/wp-json/custom-api/v1';
-
-  // Test all endpoints
+  const ports = [3001, 3002, 3003];
   const endpoints = [
-    { name: 'Health Check', url: `${baseUrl}/health` },
-    { name: 'Get Posts', url: `${baseUrl}/posts` },
-    { name: 'Get Users', url: `${baseUrl}/users` },
-    { name: 'Node.js-like Data', url: `${baseUrl}/node-data` },
+    { name: 'Health Check', path: '/health' },
+    { name: 'Get Posts', path: '/posts' },
+    { name: 'Get Users', path: '/users' },
+    { name: 'Node.js-like Data', path: '/node-data' },
   ];
 
-  for (const endpoint of endpoints) {
-    await testEndpoint(endpoint.name, endpoint.url);
+  for (const port of ports) {
+    log(`\n🔍 Testing App on port ${port}:`, 'bright');
+    const baseUrl = `http://localhost:${port}/wp-json/custom-api/v1`;
+
+    for (const endpoint of endpoints) {
+      await testEndpoint(
+        `${endpoint.name} (Port ${port})`,
+        `${baseUrl}${endpoint.path}`,
+      );
+    }
   }
 
-  log('\n🎉 API testing completed!', 'green');
+  log('\n🎉 API testing completed for all apps!', 'green');
   log('\n💡 To test with authentication, you can use:', 'yellow');
   log(
-    'curl -H "X-WP-Nonce: YOUR_NONCE" http://localhost:3000/wp-json/custom-api/v1/health',
+    'curl -H "X-WP-Nonce: YOUR_NONCE" http://localhost:3001/wp-json/custom-api/v1/health',
     'cyan',
   );
 }
@@ -439,19 +410,7 @@ async function testAPI() {
 function showHelp() {
   log('\n📖 Usage:', 'bright');
   log(
-    '   npm start                    # Start full stack (WordPress + MySQL + phpMyAdmin)',
-    'cyan',
-  );
-  log(
-    '   npm start -- --mode=full-stack  # Start full stack (default)',
-    'cyan',
-  );
-  log(
-    '   npm start -- --mode=docker-run  # Start with Docker run command (no database)',
-    'cyan',
-  );
-  log(
-    '   npm start -- --mode=compose     # Start with docker-compose.dev.yml',
+    '   npm start                    # Start full stack (3 WordPress Apps + MySQL + phpMyAdmin)',
     'cyan',
   );
   log(
@@ -471,7 +430,9 @@ function showHelp() {
   log('   WORDPRESS_PORT=3000 npm start', 'yellow');
   log('   WORDPRESS_DB_HOST=localhost:3306 npm start', 'yellow');
   log('\n🌐 Full Stack Includes:', 'bright');
-  log('   - WordPress on port 3000', 'cyan');
+  log('   - App A on port 3001', 'cyan');
+  log('   - App B on port 3002', 'cyan');
+  log('   - App C on port 3003', 'cyan');
   log('   - MySQL database on port 3306', 'cyan');
   log('   - phpMyAdmin on port 8081', 'cyan');
 }
@@ -485,9 +446,7 @@ async function main() {
     return;
   }
 
-  const runMode = getRunMode();
-
-  log(`🚀 Starting WordPress Application (${runMode})...`, 'bright');
+  log('🚀 Starting WordPress Application (Docker Compose)...', 'bright');
 
   // Check if Docker is running
   if (!checkDocker()) {
@@ -498,36 +457,20 @@ async function main() {
   stopRunningInstances();
 
   try {
-    if (runMode === 'docker-run') {
-      // Build and run with Docker
-      buildDockerImage();
-      runDockerContainer();
-    } else if (runMode === 'compose') {
-      // Check if docker-compose.dev.yml exists
-      const composeFile = normalizePath(
-        path.join(__dirname, '..', 'docker-compose.dev.yml'),
+    // Check if docker-compose.yml exists
+    const composeFile = normalizePath(
+      path.join(__dirname, '..', 'docker-compose.yml'),
+    );
+    if (!existsSync(composeFile)) {
+      log('❌ docker-compose.yml not found', 'red');
+      log(
+        '💡 Please ensure docker-compose.yml exists in the project root',
+        'yellow',
       );
-      if (!existsSync(composeFile)) {
-        log('❌ docker-compose.dev.yml not found', 'red');
-        log(
-          '💡 Use --mode=full-stack to run with the current docker-compose.yml',
-          'yellow',
-        );
-        process.exit(1);
-      }
-      runDockerCompose();
-    } else if (runMode === 'full-stack') {
-      // Check if docker-compose.yml exists
-      const composeFile = normalizePath(
-        path.join(__dirname, '..', 'docker-compose.yml'),
-      );
-      if (!existsSync(composeFile)) {
-        log('❌ docker-compose.yml not found', 'red');
-        log('💡 Use --mode=docker-run to run with Docker instead', 'yellow');
-        process.exit(1);
-      }
-      runFullStack();
+      process.exit(1);
     }
+
+    runFullStack();
 
     // Wait for WordPress to be ready
     await waitForWordPress();
@@ -569,11 +512,7 @@ module.exports = {
   checkDocker,
   stopRunningInstances,
   waitForWordPress,
-  buildDockerImage,
-  runDockerContainer,
-  runDockerCompose,
   runFullStack,
-  getRunMode,
   getDockerCommand,
   isWindows,
   testAPI,

@@ -11,41 +11,114 @@ services:
       MYSQL_DATABASE: wordpress
       MYSQL_USER: wordpress
       MYSQL_PASSWORD: wordpress_password
+      MYSQL_ROOT_HOST: '%'
     volumes:
       - db_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "3307:3306"
     networks:
       - wordpress-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "wordpress", "-pwordpress_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
-  # WordPress Application
-  wordpress:
+  # WordPress App A
+  app_a:
     build: 
       context: .
       dockerfile: Dockerfile
-    container_name: wordpress-app
+    container_name: wordpress-app-a
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
+      APACHE_PORT: 3000
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: wordpress
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD: wordpress_password
-      WORDPRESS_URL: http://localhost:3000
-      WORDPRESS_TITLE: "WordPress with Custom REST API"
+      WORDPRESS_URL: http://localhost:3001
+      WORDPRESS_TITLE: "WordPress App A - Custom REST API"
       WORDPRESS_ADMIN_USER: admin
       WORDPRESS_ADMIN_PASSWORD: admin
       WORDPRESS_ADMIN_EMAIL: admin@example.com
       WORDPRESS_DEBUG: 1
+      WORDPRESS_INSTANCE: app_a
+      WORDPRESS_TABLE_PREFIX: wp_a_
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
-      - wordpress_data:/var/www/html/wp-content/uploads
+      - wordpress_data_a:/var/www/html/wp-content/uploads
     networks:
       - wordpress-network
 
-  # phpMyAdmin (optional)
+  # WordPress App B
+  app_b:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: wordpress-app-b
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      APACHE_PORT: 3000
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress_password
+      WORDPRESS_URL: http://localhost:3002
+      WORDPRESS_TITLE: "WordPress App B - Custom REST API"
+      WORDPRESS_ADMIN_USER: admin
+      WORDPRESS_ADMIN_PASSWORD: admin
+      WORDPRESS_ADMIN_EMAIL: admin@example.com
+      WORDPRESS_DEBUG: 1
+      WORDPRESS_INSTANCE: app_b
+      WORDPRESS_TABLE_PREFIX: wp_b_
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - wordpress_data_b:/var/www/html/wp-content/uploads
+    networks:
+      - wordpress-network
+
+  # WordPress App C
+  app_c:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: wordpress-app-c
+    restart: unless-stopped
+    ports:
+      - "3003:3000"
+    environment:
+      APACHE_PORT: 3000
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress_password
+      WORDPRESS_URL: http://localhost:3003
+      WORDPRESS_TITLE: "WordPress App C - Custom REST API"
+      WORDPRESS_ADMIN_USER: admin
+      WORDPRESS_ADMIN_PASSWORD: admin
+      WORDPRESS_ADMIN_EMAIL: admin@example.com
+      WORDPRESS_DEBUG: 1
+      WORDPRESS_INSTANCE: app_c
+      WORDPRESS_TABLE_PREFIX: wp_c_
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - wordpress_data_c:/var/www/html/wp-content/uploads
+    networks:
+      - wordpress-network
+
+  # phpMyAdmin
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: wordpress-phpmyadmin
@@ -58,13 +131,16 @@ services:
       PMA_USER: wordpress
       PMA_PASSWORD: wordpress_password
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - wordpress-network
 
 volumes:
   db_data:
-  wordpress_data:
+  wordpress_data_a:
+  wordpress_data_b:
+  wordpress_data_c:
 
 networks:
   wordpress-network:
