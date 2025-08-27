@@ -24,12 +24,16 @@ class CustomRestAPI
 
     public function __construct()
     {
+        error_log('Custom REST API: Plugin constructor called');
         add_action('init', array($this, 'init'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
         add_action('rest_api_init', array($this, 'register_rest_routes'));
         add_action('wp_ajax_custom_api_action', array($this, 'handle_ajax_request'));
         add_action('wp_ajax_nopriv_custom_api_action', array($this, 'handle_ajax_request'));
+        
+        // Ensure JSON content type for all REST API responses
+        add_filter('rest_pre_serve_request', array($this, 'set_json_content_type'), 10, 4);
     }
 
     public function init()
@@ -77,10 +81,19 @@ class CustomRestAPI
 
     public function register_rest_routes()
     {
+        // Add debugging
+        error_log('Custom REST API: Registering routes...');
+        
         // Register REST API routes
         register_rest_route('custom-api/v1', '/health', array(
             'methods' => 'GET',
             'callback' => array($this, 'health_check'),
+            'permission_callback' => '__return_true'
+        ));
+
+        register_rest_route('custom-api/v1', '/test', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'test_endpoint'),
             'permission_callback' => '__return_true'
         ));
 
@@ -125,8 +138,28 @@ class CustomRestAPI
             'callback' => array($this, 'search_content'),
             'permission_callback' => '__return_true'
         ));
+        
+        error_log('Custom REST API: Routes registered successfully');
     }
 
+
+    public function test_endpoint($request)
+    {
+        $response = array(
+            'success' => true,
+            'message' => 'Custom REST API is working!',
+            'timestamp' => current_time('c'),
+            'plugin_loaded' => true,
+            'wordpress_version' => get_bloginfo('version'),
+            'rest_api_enabled' => true,
+            'endpoint' => '/wp-json/custom-api/v1/test',
+            'method' => 'GET'
+        );
+
+        $wp_response = new WP_REST_Response($response, 200);
+        $wp_response->header('Content-Type', 'application/json');
+        return $wp_response;
+    }
 
     public function health_check($request)
     {
@@ -140,7 +173,9 @@ class CustomRestAPI
             'method' => 'GET'
         );
 
-        return new WP_REST_Response($response, 200);
+        $wp_response = new WP_REST_Response($response, 200);
+        $wp_response->header('Content-Type', 'application/json');
+        return $wp_response;
     }
 
     public function get_posts($request)
@@ -203,7 +238,9 @@ class CustomRestAPI
             )
         );
 
-        return new WP_REST_Response($response, 200);
+        $wp_response = new WP_REST_Response($response, 200);
+        $wp_response->header('Content-Type', 'application/json');
+        return $wp_response;
     }
 
     public function get_users($request)
@@ -263,7 +300,9 @@ class CustomRestAPI
             )
         );
 
-        return new WP_REST_Response($response, 200);
+        $wp_response = new WP_REST_Response($response, 200);
+        $wp_response->header('Content-Type', 'application/json');
+        return $wp_response;
     }
 
     public function get_node_data($request)
@@ -299,7 +338,9 @@ class CustomRestAPI
             )
         );
 
-        return new WP_REST_Response($node_data, 200);
+        $wp_response = new WP_REST_Response($node_data, 200);
+        $wp_response->header('Content-Type', 'application/json');
+        return $wp_response;
     }
 
     public function get_categories($request)
@@ -333,7 +374,9 @@ class CustomRestAPI
             )
         );
 
-        return new WP_REST_Response($response, 200);
+        $wp_response = new WP_REST_Response($response, 200);
+        $wp_response->header('Content-Type', 'application/json');
+        return $wp_response;
     }
 
     public function get_single_post($request)
@@ -374,7 +417,9 @@ class CustomRestAPI
             )
         );
 
-        return new WP_REST_Response($response, 200);
+        $wp_response = new WP_REST_Response($response, 200);
+        $wp_response->header('Content-Type', 'application/json');
+        return $wp_response;
     }
 
     public function get_stats($request)
@@ -409,7 +454,9 @@ class CustomRestAPI
             )
         );
 
-        return new WP_REST_Response($response, 200);
+        $wp_response = new WP_REST_Response($response, 200);
+        $wp_response->header('Content-Type', 'application/json');
+        return $wp_response;
     }
 
     public function search_content($request)
@@ -475,7 +522,9 @@ class CustomRestAPI
             )
         );
 
-        return new WP_REST_Response($response, 200);
+        $wp_response = new WP_REST_Response($response, 200);
+        $wp_response->header('Content-Type', 'application/json');
+        return $wp_response;
     }
 
     public function handle_ajax_request()
@@ -536,6 +585,15 @@ class CustomRestAPI
                 );
             }
         }
+    }
+
+    public function set_json_content_type($served, $result, $request, $server)
+    {
+        // Check if this is our custom API endpoint
+        if (strpos($request->get_route(), 'custom-api/v1') !== false) {
+            header('Content-Type: application/json; charset=UTF-8');
+        }
+        return $served;
     }
 }
 
