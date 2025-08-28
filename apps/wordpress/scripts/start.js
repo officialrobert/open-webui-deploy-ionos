@@ -98,27 +98,36 @@ function checkDocker() {
 
 function checkIfAppsAreRunning() {
   log('🔍 Checking if WordPress apps are already running...', 'cyan');
-  
+
   const dockerCompose = getDockerCommand();
-  const containerNames = ['wordpress-app-a', 'wordpress-app-b', 'wordpress-app-c'];
+  const containerNames = [
+    'wordpress-app-a',
+    'wordpress-app-b',
+    'wordpress-app-c',
+  ];
   let runningContainers = 0;
-  
+
   try {
     // Check if containers are running
     for (const containerName of containerNames) {
-      const containerStatus = execCommandSilent(`docker ps --filter name=${containerName} --format "{{.Status}}"`);
+      const containerStatus = execCommandSilent(
+        `docker ps --filter name=${containerName} --format "{{.Status}}"`,
+      );
       if (containerStatus && containerStatus.trim()) {
-        log(`✅ ${containerName} is running: ${containerStatus.trim()}`, 'green');
+        log(
+          `✅ ${containerName} is running: ${containerStatus.trim()}`,
+          'green',
+        );
         runningContainers++;
       } else {
         log(`❌ ${containerName} is not running`, 'red');
       }
     }
-    
+
     // Check if ports are accessible
     const ports = [3001, 3002, 3003];
     let accessiblePorts = 0;
-    
+
     for (const port of ports) {
       try {
         const portCheckCommand = getPortCheckCommand(port);
@@ -133,15 +142,20 @@ function checkIfAppsAreRunning() {
         log(`❌ Port ${port} is not accessible`, 'red');
       }
     }
-    
-    if (runningContainers === containerNames.length && accessiblePorts === ports.length) {
+
+    if (
+      runningContainers === containerNames.length &&
+      accessiblePorts === ports.length
+    ) {
       log('✅ All WordPress apps are running and accessible', 'green');
       return true;
     } else {
-      log(`⚠️  ${runningContainers}/${containerNames.length} containers running, ${accessiblePorts}/${ports.length} ports accessible`, 'yellow');
+      log(
+        `⚠️  ${runningContainers}/${containerNames.length} containers running, ${accessiblePorts}/${ports.length} ports accessible`,
+        'yellow',
+      );
       return false;
     }
-    
   } catch (error) {
     log('❌ Error checking app status', 'red');
     return false;
@@ -498,7 +512,7 @@ async function main() {
 
   // Check if already running using Docker commands
   const isAlreadyRunning = checkIfAppsAreRunning();
-  
+
   if (isAlreadyRunning) {
     log('⚠️  WordPress apps are already running', 'yellow');
     log('📋 Showing recent Docker logs...', 'cyan');
@@ -513,10 +527,7 @@ async function main() {
       execSync(`${dockerCompose} ps`, { stdio: 'inherit' });
 
       log('\n💡 Use "npm run stop" to stop the application', 'yellow');
-      log(
-        '💡 Use "npm run start:logs" to follow logs in real-time',
-        'yellow',
-      );
+      log('💡 Use "npm run start:logs" to follow logs in real-time', 'yellow');
     } catch (error) {
       log('❌ Could not fetch Docker logs', 'red');
     }

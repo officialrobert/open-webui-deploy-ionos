@@ -6,15 +6,13 @@
   "scripts": {
     "start": "node scripts/start.js",
     "stop": "node scripts/stop.js",
-    "start:detach": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' up -d --build', { stdio: 'inherit' })\"",
+    "health": "node scripts/health.js",
     "start:logs": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs -f', { stdio: 'inherit' })\"",
-    "start:restart": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' restart', { stdio: 'inherit' })\"",
     "start:clean": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' down -v --remove-orphans', { stdio: 'inherit' })\"",
     "test-api": "node -e \"require('./scripts/start.js').testAPI()\"",
     "build:plugin": "cd wp-content/plugins/custom-rest-api && npm run build",
     "watch:plugin": "cd wp-content/plugins/custom-rest-api && npm run watch",
     "install:plugin": "cd wp-content/plugins/custom-rest-api && npm install",
-    "status": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' ps', { stdio: 'inherit' })\"",
     "shell:app_a": "node -e \"const { getDockerCommand, isWindows } = require('./scripts/start.js'); const cmd = getDockerCommand(); const shell = isWindows() ? 'powershell' : 'bash'; require('child_process').execSync(cmd + ' exec app_a ' + shell, { stdio: 'inherit' })\"",
     "shell:app_b": "node -e \"const { getDockerCommand, isWindows } = require('./scripts/start.js'); const cmd = getDockerCommand(); const shell = isWindows() ? 'powershell' : 'bash'; require('child_process').execSync(cmd + ' exec app_b ' + shell, { stdio: 'inherit' })\"",
     "shell:app_c": "node -e \"const { getDockerCommand, isWindows } = require('./scripts/start.js'); const cmd = getDockerCommand(); const shell = isWindows() ? 'powershell' : 'bash'; require('child_process').execSync(cmd + ' exec app_c ' + shell, { stdio: 'inherit' })\"",
@@ -24,8 +22,7 @@
     "logs:app_c": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs app_c', { stdio: 'inherit' })\"",
     "logs:db": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs db', { stdio: 'inherit' })\"",
     "clean:all": "docker system prune -f && docker volume prune -f",
-    "reset": "npm run start:clean && npm start",
-    "help": "node scripts/start.js --help"
+    "reset": "npm run start:clean && npm start"
   },
   "keywords": [
     "wordpress",
