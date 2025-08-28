@@ -1,12 +1,14 @@
-# WordPress + Custom REST API Plugin - Docker Setup
+# WordPress Asynchronous Startup with Enhanced Observability
 
-This project provides a complete Docker setup for running WordPress with a custom REST API plugin that includes TypeScript/Node.js-like functionality.
+This project provides a complete Docker setup for running WordPress with a custom REST API plugin, featuring asynchronous startup, comprehensive health monitoring, and cross-platform compatibility.
 
 ## 🏗️ Architecture
 
 - **WordPress Applications**: 3 separate WordPress instances (App A, App B, App C) with custom REST API
 - **Custom REST API Plugin**: TypeScript-based plugin with Node.js-like functionality
 - **Database**: MySQL 8.0 (shared across all apps) with phpMyAdmin for management
+- **Asynchronous Startup**: Non-blocking container startup with real-time logging
+- **Health Monitoring**: Comprehensive resource and status monitoring
 
 ## 📁 Project Structure
 
@@ -16,10 +18,16 @@ apps/wordpress/
 ├── docker-compose.yml           # Full stack (WordPress + MySQL + phpMyAdmin)
 ├── .dockerignore                # Docker ignore rules
 ├── scripts/
-│   └── start.js                 # Unified startup script
+│   ├── start.js                 # Asynchronous startup script
+│   ├── stop.js                  # Docker-based stop script
+│   └── health.js                # Health monitoring script
 ├── wp-content/
 │   └── plugins/
 │       └── custom-rest-api/     # Custom REST API plugin
+├── logs/                        # Host-mounted log directories
+│   ├── app_a/                   # App A logs (startup, error, system, apache)
+│   ├── app_b/                   # App B logs
+│   └── app_c/                   # App C logs
 └── README.md                    # This file
 ```
 
@@ -28,7 +36,7 @@ apps/wordpress/
 ### Prerequisites
 
 - Docker and Docker Compose installed
-- Node.js (for running the startup script)
+- Node.js (for running the management scripts)
 - Git (for cloning the repository)
 
 ### Start the Application
@@ -46,40 +54,129 @@ npm start
 - ✅ Shared MySQL 8.0 database with fresh installation on each start
 - ✅ phpMyAdmin for database management
 - ✅ Cross-platform compatibility (Windows, Linux, macOS)
-- ✅ Automatic container management
+- ✅ Asynchronous startup with non-blocking logging
+- ✅ Comprehensive health monitoring
+- ✅ Host-accessible log files
+- ✅ Docker-based status checking (no PID files)
 - ✅ Health checks and API testing
 - ✅ Load balancer ready (ports 3001, 3002, 3003)
 
-### Start the Application
+## 🛠️ Management Commands
+
+### Core Commands
 
 ```bash
-# Start the full stack (WordPress + MySQL + phpMyAdmin)
+# Start all applications (asynchronous)
 npm start
+
+# Stop all applications (Docker-based)
+npm run stop
+
+# Health monitoring (CPU, memory, status)
+npm run health
+
+# Full reset (clean + start)
+npm run reset
 ```
 
-
-
-## 🔧 Manual Docker Commands
-
-### Full Stack (Recommended)
+### Logging & Monitoring
 
 ```bash
-# Build and start full stack environment
-docker-compose up --build
+# View all container logs
+npm run start:logs
 
-# Start in background
-docker-compose up -d
+# View individual app logs
+npm run logs:app_a
+npm run logs:app_b
+npm run logs:app_c
+npm run logs:db
 
-# View logs for specific apps
-docker-compose logs -f app_a
-docker-compose logs -f app_b
-docker-compose logs -f app_c
-
-# Stop environment
-docker-compose down
+# Clean restart (remove volumes)
+npm run start:clean
 ```
 
+### Development & Access
 
+```bash
+# Access container shells
+npm run shell:app_a
+npm run shell:app_b
+npm run shell:app_c
+
+# Access database shell
+npm run db:shell
+
+# Test REST API endpoints
+npm run test-api
+```
+
+### Plugin Development
+
+```bash
+# Build the custom plugin
+npm run build:plugin
+
+# Watch plugin for changes
+npm run watch:plugin
+
+# Install plugin dependencies
+npm run install:plugin
+```
+
+### System Maintenance
+
+```bash
+# Clean Docker system and volumes
+npm run clean:all
+```
+
+## 🏥 Health Monitoring
+
+The health script provides comprehensive monitoring of your WordPress applications:
+
+```bash
+npm run health
+```
+
+**What it monitors:**
+- ✅ Container status and health
+- ✅ CPU and memory usage
+- ✅ Network and disk I/O
+- ✅ Port accessibility
+- ✅ System resource overview
+- ✅ Individual container responsiveness
+
+**Status Indicators:**
+- 🟢 - Healthy/Running
+- 🟡 - Running but needs attention
+- 🔴 - Stopped/Error
+- ⚪ - Not found
+
+## 📊 Logging System
+
+### Host-Accessible Logs
+
+Logs are automatically created and accessible from the host system:
+
+```
+./logs/
+├── app_a/
+│   ├── startup.log      # Startup process logs
+│   ├── error.log        # Error logs
+│   ├── system.log       # System information
+│   └── apache.log       # Apache web server logs
+├── app_b/
+│   └── ... (same structure)
+└── app_c/
+    └── ... (same structure)
+```
+
+### Log Features
+
+- **Structured Logging**: Different log types with timestamps
+- **Color Coding**: Easy-to-read colored output
+- **Real-time Access**: Logs are immediately available on host
+- **Cross-Platform**: Works on Windows, Linux, and macOS
 
 ## 🧪 Testing the API
 
@@ -111,21 +208,6 @@ docker-compose exec db mysql -u wordpress -pwordpress_password -e "SHOW TABLES;"
 # wp_b_posts, wp_b_users, wp_b_options (for App B)
 # wp_c_posts, wp_c_users, wp_c_options (for App C)
 ```
-
-### Preventing Redirect Issues
-
-If you experience redirects between instances (e.g., accessing port 3002 redirects to 3001):
-
-1. **Clear browser cache and cookies**
-2. **Use incognito/private browsing mode**
-3. **Check for browser extensions causing redirects**
-4. **Verify each instance has correct site URL**:
-   ```bash
-   # Check site URLs in database
-   docker-compose exec db mysql -u wordpress -pwordpress_password -e "SELECT option_name, option_value FROM wp_a_options WHERE option_name IN ('home', 'siteurl');" wordpress
-   docker-compose exec db mysql -u wordpress -pwordpress_password -e "SELECT option_name, option_value FROM wp_b_options WHERE option_name IN ('home', 'siteurl');" wordpress
-   docker-compose exec db mysql -u wordpress -pwordpress_password -e "SELECT option_name, option_value FROM wp_c_options WHERE option_name IN ('home', 'siteurl');" wordpress
-   ```
 
 ### Manual Testing
 
@@ -166,11 +248,7 @@ Once the environment is running, you can access:
 - **App C - Admin**: http://localhost:3003/wp-admin
 - **App C - REST API**: http://localhost:3003/wp-json/custom-api/v1/health
 - **phpMyAdmin**: http://localhost:8081
-- **MySQL Database**: localhost:3306
-
-
-
-
+- **MySQL Database**: localhost:3307
 
 ## 🔧 Development Workflow
 
@@ -180,14 +258,24 @@ Once the environment is running, you can access:
 npm start
 ```
 
-### 2. Edit Plugin Code
+### 2. Monitor Health
+
+```bash
+# Check application health
+npm run health
+
+# View logs
+npm run logs:app_a
+```
+
+### 3. Edit Plugin Code
 
 The plugin source is available for editing:
 - Edit `wp-content/plugins/custom-rest-api/src/api.ts`
-- Rebuild the plugin if needed
+- Rebuild the plugin if needed: `npm run build:plugin`
 - Refresh browser to see changes
 
-### 3. Test Changes
+### 4. Test Changes
 
 ```bash
 # Test API endpoints for all apps
@@ -197,16 +285,6 @@ npm run test-api
 curl http://localhost:3001/wp-json/custom-api/v1/health
 curl http://localhost:3002/wp-json/custom-api/v1/health
 curl http://localhost:3003/wp-json/custom-api/v1/health
-```
-
-### 4. Build Plugin
-
-```bash
-# Navigate to plugin directory
-cd wp-content/plugins/custom-rest-api
-
-# Build TypeScript
-npm run build
 ```
 
 ## 🐳 Docker Configuration Details
@@ -225,6 +303,7 @@ WORDPRESS_ADMIN_USER: admin
 WORDPRESS_ADMIN_PASSWORD: admin
 WORDPRESS_ADMIN_EMAIL: admin@example.com
 WORDPRESS_DEBUG: 1
+WORDPRESS_TABLE_PREFIX: wp_a_ (App A), wp_b_ (App B), wp_c_ (App C)
 
 # MySQL Configuration
 MYSQL_ROOT_PASSWORD: rootpassword
@@ -245,38 +324,38 @@ PMA_PASSWORD: wordpress_password
 
 1. **Port Conflicts**
    ```bash
-   # Check what's using port 80
-   sudo lsof -i :80
+   # Check what's using the ports
+   netstat -an | findstr :3001  # Windows
+   netstat -tuln | grep :3001   # Linux/macOS
    
-   # Or use different ports
-   # Edit docker-compose.yml and change ports
+   # Or use different ports in docker-compose.yml
    ```
 
 2. **Database Connection Issues**
    ```bash
    # Check database logs
-   docker-compose logs db
+   npm run logs:db
    
-   # Restart database
-   docker-compose restart db
+   # Check health status
+   npm run health
    ```
 
 3. **Plugin Not Working**
    ```bash
    # Check WordPress logs
-   docker-compose logs wordpress
+   npm run logs:app_a
    
-   # Check plugin build
-   docker exec -it wordpress bash
-   cd wp-content/plugins/custom-rest-api
-   npm run build
+   # Rebuild plugin
+   npm run build:plugin
    ```
 
-4. **Permission Issues**
+4. **Container Not Starting**
    ```bash
-   # Fix file permissions
-   sudo chown -R $USER:$USER .
-   chmod -R 755 .
+   # Check health status
+   npm run health
+   
+   # View startup logs
+   npm run logs:app_a
    ```
 
 5. **Table Prefix Issues**
@@ -285,20 +364,14 @@ PMA_PASSWORD: wordpress_password
    docker-compose exec db mysql -u wordpress -pwordpress_password -e "SHOW TABLES;" wordpress
    
    # If tables are not separated, restart the containers
-   docker-compose down
-   docker-compose up -d
-   
-   # Check the wp-config.php in each container
-   docker-compose exec app_a cat /var/www/html/wp-config.php | grep table_prefix
-   docker-compose exec app_b cat /var/www/html/wp-config.php | grep table_prefix
-   docker-compose exec app_c cat /var/www/html/wp-config.php | grep table_prefix
+   npm run reset
    ```
 
 ### Debug Mode
 
 **Enable WordPress Debug:**
 ```php
-// In wp-config.php
+// In wp-config.php (already enabled by default)
 define('WP_DEBUG', true);
 define('WP_DEBUG_LOG', true);
 define('WP_DEBUG_DISPLAY', false);
@@ -307,11 +380,10 @@ define('WP_DEBUG_DISPLAY', false);
 **View Debug Logs:**
 ```bash
 # View WordPress debug logs
-docker exec -it wordpress cat /var/www/html/wp-content/debug.log
+npm run logs:app_a
 
-# Or mount logs to host
-# Add to docker-compose.yml volumes:
-# - ./logs:/var/www/html/wp-content/logs
+# Or check host-mounted logs
+cat ./logs/app_a/error.log
 ```
 
 ## 📊 Monitoring
@@ -319,8 +391,8 @@ docker exec -it wordpress cat /var/www/html/wp-content/debug.log
 ### Health Checks
 
 ```bash
-# Check all services
-docker-compose ps
+# Comprehensive health check
+npm run health
 
 # Check service health for all apps
 docker-compose exec app_a curl -f http://localhost/wp-json/custom-api/v1/health
@@ -328,14 +400,14 @@ docker-compose exec app_b curl -f http://localhost/wp-json/custom-api/v1/health
 docker-compose exec app_c curl -f http://localhost/wp-json/custom-api/v1/health
 
 # Monitor logs
-docker-compose logs -f
+npm run start:logs
 ```
 
 ### Performance Monitoring
 
 ```bash
 # Check container resource usage
-docker stats
+npm run health
 
 # Check WordPress performance for all apps
 curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3001/wp-json/custom-api/v1/health
@@ -364,13 +436,11 @@ curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3003/wp-json/custom-
 ### Local Build
 
 ```bash
-# Build image
-docker-compose build
-
 # Start environment
-docker-compose up -d
+npm start
 
 # Verify deployment
+npm run health
 npm run test-api
 ```
 
@@ -422,12 +492,31 @@ npm run test-api
 }
 ```
 
+## 🌍 Cross-Platform Compatibility
+
+This project is designed to work seamlessly across different operating systems:
+
+### Windows
+- Uses PowerShell for command execution
+- Windows-compatible port checking
+- Proper path handling
+
+### Linux/macOS
+- Uses Bash for command execution
+- Unix-compatible port checking
+- Standard path handling
+
+### Docker Commands
+- Universal Docker interface
+- Cross-platform container management
+- Consistent behavior across platforms
+
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test with `npm run test-api`
+4. Test with `npm run health` and `npm run test-api`
 5. Submit a pull request
 
 ## 📄 License
@@ -439,7 +528,8 @@ This project is licensed under the MIT License.
 For support and questions:
 
 1. Check the troubleshooting section
-2. Review Docker logs: `docker-compose logs`
-3. Test API endpoints: `npm run test-api`
-4. Check WordPress debug logs
+2. Run health check: `npm run health`
+3. Review logs: `npm run logs:app_a`
+4. Test API endpoints: `npm run test-api`
+5. Check WordPress debug logs in `./logs/` directory
 
