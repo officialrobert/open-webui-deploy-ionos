@@ -96,6 +96,58 @@ function checkDocker() {
   }
 }
 
+function checkIfAppsAreRunning() {
+  log('🔍 Checking if WordPress apps are already running...', 'cyan');
+  
+  const dockerCompose = getDockerCommand();
+  const containerNames = ['wordpress-app-a', 'wordpress-app-b', 'wordpress-app-c'];
+  let runningContainers = 0;
+  
+  try {
+    // Check if containers are running
+    for (const containerName of containerNames) {
+      const containerStatus = execCommandSilent(`docker ps --filter name=${containerName} --format "{{.Status}}"`);
+      if (containerStatus && containerStatus.trim()) {
+        log(`✅ ${containerName} is running: ${containerStatus.trim()}`, 'green');
+        runningContainers++;
+      } else {
+        log(`❌ ${containerName} is not running`, 'red');
+      }
+    }
+    
+    // Check if ports are accessible
+    const ports = [3001, 3002, 3003];
+    let accessiblePorts = 0;
+    
+    for (const port of ports) {
+      try {
+        const portCheckCommand = getPortCheckCommand(port);
+        const portStatus = execCommandSilent(portCheckCommand);
+        if (portStatus && portStatus.trim()) {
+          log(`✅ Port ${port} is accessible`, 'green');
+          accessiblePorts++;
+        } else {
+          log(`❌ Port ${port} is not accessible`, 'red');
+        }
+      } catch (error) {
+        log(`❌ Port ${port} is not accessible`, 'red');
+      }
+    }
+    
+    if (runningContainers === containerNames.length && accessiblePorts === ports.length) {
+      log('✅ All WordPress apps are running and accessible', 'green');
+      return true;
+    } else {
+      log(`⚠️  ${runningContainers}/${containerNames.length} containers running, ${accessiblePorts}/${ports.length} ports accessible`, 'yellow');
+      return false;
+    }
+    
+  } catch (error) {
+    log('❌ Error checking app status', 'red');
+    return false;
+  }
+}
+
 function stopRunningInstances() {
   log('🔄 Checking for running instances...', 'cyan');
 
@@ -274,8 +326,6 @@ function displayAccessInfo() {
   log('   - Logs: docker-compose logs app_a', 'yellow');
   log('   - Logs: docker-compose logs app_b', 'yellow');
   log('   - Logs: docker-compose logs app_c', 'yellow');
-
-  log('\n🛑 Press Ctrl+C to stop the application', 'magenta');
 }
 
 function cleanup() {
@@ -446,14 +496,44 @@ async function main() {
     return;
   }
 
-  log('🚀 Starting WordPress Application (Docker Compose)...', 'bright');
+  // Check if already running using Docker commands
+  const isAlreadyRunning = checkIfAppsAreRunning();
+  
+  if (isAlreadyRunning) {
+    log('⚠️  WordPress apps are already running', 'yellow');
+    log('📋 Showing recent Docker logs...', 'cyan');
+
+    // Show recent Docker logs
+    try {
+      const dockerCompose = getDockerCommand();
+      log('\n🐳 Recent Docker logs:', 'bright');
+      execSync(`${dockerCompose} logs --tail=20`, { stdio: 'inherit' });
+
+      log('\n📊 Container status:', 'bright');
+      execSync(`${dockerCompose} ps`, { stdio: 'inherit' });
+
+      log('\n💡 Use "npm run stop" to stop the application', 'yellow');
+      log(
+        '💡 Use "npm run start:logs" to follow logs in real-time',
+        'yellow',
+      );
+    } catch (error) {
+      log('❌ Could not fetch Docker logs', 'red');
+    }
+    return;
+  }
+
+  log(
+    '🚀 Starting WordPress Application (Docker Compose) in background...',
+    'bright',
+  );
 
   // Check if Docker is running
   if (!checkDocker()) {
     process.exit(1);
   }
 
-  // Stop any running instances before starting
+  // Stop any existing instances
   stopRunningInstances();
 
   try {
@@ -489,8 +569,11 @@ async function main() {
       process.exit(0);
     });
 
-    // Keep the script running
-    process.stdin.resume();
+    log(
+      '✅ WordPress application started successfully in background!',
+      'green',
+    );
+    log('💡 Use "npm run stop" to stop the application', 'yellow');
   } catch (error) {
     log(`❌ Error: ${error.message}`, 'red');
     cleanup();
@@ -518,4 +601,5 @@ module.exports = {
   testAPI,
   testEndpoint,
   makeRequest,
+  checkIfAppsAreRunning,
 };

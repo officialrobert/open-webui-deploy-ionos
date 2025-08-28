@@ -5,11 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node scripts/start.js",
+    "stop": "node scripts/stop.js",
     "start:detach": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' up -d --build', { stdio: 'inherit' })\"",
     "start:logs": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs -f', { stdio: 'inherit' })\"",
     "start:restart": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' restart', { stdio: 'inherit' })\"",
     "start:clean": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' down -v --remove-orphans', { stdio: 'inherit' })\"",
-    "start:stop": "node -e \"require('./scripts/start.js').stopRunningInstances()\"",
     "test-api": "node -e \"require('./scripts/start.js').testAPI()\"",
     "build:plugin": "cd wp-content/plugins/custom-rest-api && npm run build",
     "watch:plugin": "cd wp-content/plugins/custom-rest-api && npm run watch",
@@ -25,8 +25,7 @@
     "logs:db": "node -e \"const { getDockerCommand } = require('./scripts/start.js'); const cmd = getDockerCommand(); require('child_process').execSync(cmd + ' logs db', { stdio: 'inherit' })\"",
     "clean:all": "docker system prune -f && docker volume prune -f",
     "reset": "npm run start:clean && npm start",
-    "help": "node scripts/start.js --help",
-    "test:table-prefix": "node -e \"const { createWpConfig } = require('./start-wordpress.js'); process.env.WORDPRESS_INSTANCE = 'app_a'; process.env.WORDPRESS_TABLE_PREFIX = 'wp_a_'; process.env.WORDPRESS_DB_NAME = 'wordpress'; process.env.WORDPRESS_DB_USER = 'wordpress'; process.env.WORDPRESS_DB_PASSWORD = 'wordpress_password'; process.env.WORDPRESS_DB_HOST = 'db:3306'; process.env.WORDPRESS_URL = 'http://localhost:3001'; process.env.WORDPRESS_DEBUG = '1'; console.log('Testing table prefix functionality...');\""
+    "help": "node scripts/start.js --help"
   },
   "keywords": [
     "wordpress",
