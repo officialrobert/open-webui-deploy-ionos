@@ -1,0 +1,155 @@
+name: Deploy WordPress Apps to IONOS Container Registry
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'apps/wordpress/**'
+  workflow_dispatch:
+
+env:
+  REGISTRY_NAME: wordpress-apps
+  REGISTRY_LOCATION: de/txl
+  IMAGE_PREFIX: wordpress-app
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to IONOS Container Registry
+      run: |
+        # Step 1: Get access token using secure token
+        echo "Getting access token..."
+        ACCESS_TOKEN_RESPONSE=$(curl -s -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer ${{ secrets.IONOS_SECURE_TOKEN }}" \
+          -d '{"grant_type": "client_credentials"}' \
+          "https://api.ionos.com/auth/v1/tokens")
+        
+        ACCESS_TOKEN=$(echo $ACCESS_TOKEN_RESPONSE | jq -r '.access_token')
+        echo "Access token obtained"
+        
+        # Step 2: Create or get container registry token
+        echo "Creating container registry token..."
+        TOKEN_RESPONSE=$(curl -s -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $ACCESS_TOKEN" \
+          -d '{
+            "properties": {
+              "name": "github-actions-token",
+              "expiryDate": "'$(date -d '+1 year' -u +%Y-%m-%dT%H:%M:%SZ)'",
+              "scopes": [
+                {
+                  "name": "push",
+                  "actions": ["push"]
+                },
+                {
+                  "name": "pull",
+                  "actions": ["pull"]
+                }
+              ]
+            }
+          }' \
+          "https://api.ionos.com/containerregistries/registries")
+        
+        TOKEN_ID=$(echo $TOKEN_RESPONSE | jq -r '.id')
+        TOKEN_SECRET=$(echo $TOKEN_RESPONSE | jq -r '.properties.credentials.password')
+        REGISTRY_HOSTNAME=$(echo $TOKEN_RESPONSE | jq -r '.properties.hostname')
+        
+        echo "Token created with ID: $TOKEN_ID"
+        echo "Registry hostname: $REGISTRY_HOSTNAME"
+        
+        # Step 3: Create or update container registry
+        echo "Creating/updating container registry..."
+        REGISTRY_RESPONSE=$(curl -s -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $ACCESS_TOKEN" \
+          -d '{
+            "properties": {
+              "name": "'${{ env.REGISTRY_NAME }}'",
+              "location": "'${{ env.REGISTRY_LOCATION }}'",
+              "garbageCollectionSchedule": {
+                "days": ["Sunday"],
+                "time": "02:00:00+00:00"
+              },
+              "features": {
+                "vulnerabilityScanning": {
+                  "enabled": true
+                }
+              }
+            }
+          }' \
+          "https://api.ionos.com/containerregistries/registries")
+        
+        echo "Registry response: $REGISTRY_RESPONSE"
+        
+        # Step 4: Login to Docker registry
+        echo "$TOKEN_SECRET" | docker login $REGISTRY_HOSTNAME -u $TOKEN_ID --password-stdin
+        
+        # Store values for later use
+        echo "REGISTRY_HOSTNAME=$REGISTRY_HOSTNAME" >> $GITHUB_ENV
+        echo "TOKEN_ID=$TOKEN_ID" >> $GITHUB_ENV
+
+    - name: Build and push app_a
+      run: |
+        cd apps/wordpress
+        docker build -t ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-a:${{ github.sha }} \
+          --build-arg APP_INSTANCE=app_a \
+          --build-arg APP_PORT=3001 \
+          --build-arg APP_TITLE="WordPress App A - Custom REST API" \
+          --build-arg TABLE_PREFIX=wp_a_ .
+        docker push ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-a:${{ github.sha }}
+        docker tag ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-a:${{ github.sha }} \
+          ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-a:latest
+        docker push ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-a:latest
+
+    - name: Build and push app_b
+      run: |
+        cd apps/wordpress
+        docker build -t ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-b:${{ github.sha }} \
+          --build-arg APP_INSTANCE=app_b \
+          --build-arg APP_PORT=3002 \
+          --build-arg APP_TITLE="WordPress App B - Custom REST API" \
+          --build-arg TABLE_PREFIX=wp_b_ .
+        docker push ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-b:${{ github.sha }}
+        docker tag ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-b:${{ github.sha }} \
+          ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-b:latest
+        docker push ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-b:latest
+
+    - name: Build and push app_c
+      run: |
+        cd apps/wordpress
+        docker build -t ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-c:${{ github.sha }} \
+          --build-arg APP_INSTANCE=app_c \
+          --build-arg APP_PORT=3003 \
+          --build-arg APP_TITLE="WordPress App C - Custom REST API" \
+          --build-arg TABLE_PREFIX=wp_c_ .
+        docker push ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-c:${{ github.sha }}
+        docker tag ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-c:${{ github.sha }} \
+          ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-c:latest
+        docker push ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-c:latest
+
+    - name: Output deployment info
+      run: |
+        echo "## 🚀 Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Registry:** ${{ env.REGISTRY_HOSTNAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Images deployed:**" >> $GITHUB_STEP_SUMMARY
+        echo "- ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-a:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-b:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ${{ env.REGISTRY_HOSTNAME }}/${{ env.IMAGE_PREFIX }}-c:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Latest tags also updated**" >> $GITHUB_STEP_SUMMARY
+
+    - name: Cleanup (optional)
+      if: always()
+      run: |
+        # Clean up local images to save space
+        docker system prune -f
