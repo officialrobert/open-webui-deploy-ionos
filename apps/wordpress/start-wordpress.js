@@ -176,6 +176,28 @@ define( 'AUTOMATIC_UPDATER_DISABLED', false );
 define( 'WP_CONTENT_DIR', __DIR__ . '/wp-content' );
 define( 'WP_CONTENT_URL', 'http://' . $_SERVER['HTTP_HOST'] . '/wp-content' );
 
+// Proxy Trust Configuration
+// Trust proxy headers for proper IP detection and SSL handling
+if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+    $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
+}
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    $_SERVER['HTTPS'] = 'on';
+}
+if (isset($_SERVER['HTTP_X_FORWARDED_HOST'])) {
+    $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_X_FORWARDED_HOST'];
+}
+
+// WordPress proxy settings
+define( 'WP_PROXY_HOST', '${process.env.WP_PROXY_HOST || ''}' );
+define( 'WP_PROXY_PORT', '${process.env.WP_PROXY_PORT || ''}' );
+define( 'WP_PROXY_USERNAME', '${process.env.WP_PROXY_USERNAME || ''}' );
+define( 'WP_PROXY_PASSWORD', '${process.env.WP_PROXY_PASSWORD || ''}' );
+define( 'WP_PROXY_BYPASS_HOSTS', '${process.env.WP_PROXY_BYPASS_HOSTS || 'localhost,127.0.0.1'}' );
+
+// Trust all proxy headers (use with caution in production)
+define( 'WP_HTTP_BLOCK_EXTERNAL', false );
+
 /* That's all, stop editing! Happy publishing. */
 
 /** Absolute path to the WordPress directory. */
@@ -427,6 +449,26 @@ function configureApache() {
         AllowOverride All
         Require all granted
     </Directory>
+`;
+    }
+
+    // Add proxy headers configuration
+    if (!vhostContent.includes('RemoteIPHeader')) {
+      vhostContent += `
+    # Proxy Headers Configuration
+    RemoteIPHeader X-Forwarded-For
+    RemoteIPInternalProxy 10.0.0.0/8
+    RemoteIPInternalProxy 172.16.0.0/12
+    RemoteIPInternalProxy 192.168.0.0/16
+    RemoteIPInternalProxy 127.0.0.1
+    RemoteIPInternalProxy ::1
+    
+    # Trust proxy headers
+    RequestHeader set X-Forwarded-Proto "http"
+    RequestHeader set X-Forwarded-Port "80"
+    
+    # Enable mod_remoteip
+    LoadModule remoteip_module modules/mod_remoteip.so
 `;
     }
 

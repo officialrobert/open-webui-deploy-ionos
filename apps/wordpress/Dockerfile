@@ -49,6 +49,8 @@ RUN docker-php-ext-install mysqli pdo pdo_mysql
 
 # Enable Apache modules
 RUN a2enmod rewrite
+RUN a2enmod remoteip
+RUN a2enmod headers
 
 # Copy package.json files FIRST for better caching (only rebuilds when dependencies change)
 COPY package.json /usr/local/bin/
@@ -99,13 +101,18 @@ RUN sed -i "s/Listen 80/Listen 0.0.0.0:3000/" /etc/apache2/ports.conf \
     && sed -i "s/<VirtualHost \*:80>/<VirtualHost *:3000>/" /etc/apache2/sites-available/000-default.conf \
     && echo "ServerName localhost" >> /etc/apache2/sites-available/000-default.conf
 
-# Add .htaccess for WordPress
+# Add .htaccess for WordPress with proxy support
 RUN echo 'RewriteEngine On' > /var/www/html/.htaccess \
     && echo 'RewriteBase /' >> /var/www/html/.htaccess \
     && echo 'RewriteRule ^index\.php$ - [L]' >> /var/www/html/.htaccess \
     && echo 'RewriteCond %{REQUEST_FILENAME} !-f' >> /var/www/html/.htaccess \
     && echo 'RewriteCond %{REQUEST_FILENAME} !-d' >> /var/www/html/.htaccess \
-    && echo 'RewriteRule . /index.php [L]' >> /var/www/html/.htaccess
+    && echo 'RewriteRule . /index.php [L]' >> /var/www/html/.htaccess \
+    && echo '' >> /var/www/html/.htaccess \
+    && echo '# Proxy Trust Configuration' >> /var/www/html/.htaccess \
+    && echo 'SetEnvIf X-Forwarded-Proto https HTTPS=on' >> /var/www/html/.htaccess \
+    && echo 'SetEnvIf X-Forwarded-Proto https SERVER_PORT=443' >> /var/www/html/.htaccess \
+    && echo 'SetEnvIf X-Forwarded-Proto http SERVER_PORT=80' >> /var/www/html/.htaccess
 
 # Create a health check script
 RUN echo '#!/bin/bash' > /usr/local/bin/healthcheck.sh \

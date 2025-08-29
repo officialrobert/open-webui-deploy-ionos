@@ -48,6 +48,12 @@ services:
       WORDPRESS_DEBUG: 1
       WORDPRESS_INSTANCE: app_a
       WORDPRESS_TABLE_PREFIX: wp_a_
+      # Proxy Configuration
+      WP_PROXY_HOST: ""
+      WP_PROXY_PORT: ""
+      WP_PROXY_USERNAME: ""
+      WP_PROXY_PASSWORD: ""
+      WP_PROXY_BYPASS_HOSTS: "localhost,127.0.0.1"
     depends_on:
       db:
         condition: service_healthy
@@ -79,6 +85,12 @@ services:
       WORDPRESS_DEBUG: 1
       WORDPRESS_INSTANCE: app_b
       WORDPRESS_TABLE_PREFIX: wp_b_
+      # Proxy Configuration
+      WP_PROXY_HOST: ""
+      WP_PROXY_PORT: ""
+      WP_PROXY_USERNAME: ""
+      WP_PROXY_PASSWORD: ""
+      WP_PROXY_BYPASS_HOSTS: "localhost,127.0.0.1"
     depends_on:
       db:
         condition: service_healthy
@@ -110,6 +122,12 @@ services:
       WORDPRESS_DEBUG: 1
       WORDPRESS_INSTANCE: app_c
       WORDPRESS_TABLE_PREFIX: wp_c_
+      # Proxy Configuration
+      WP_PROXY_HOST: ""
+      WP_PROXY_PORT: ""
+      WP_PROXY_USERNAME: ""
+      WP_PROXY_PASSWORD: ""
+      WP_PROXY_BYPASS_HOSTS: "localhost,127.0.0.1"
     depends_on:
       db:
         condition: service_healthy
