@@ -312,21 +312,21 @@ function displayAccessInfo() {
   log('   App A - WordPress: http://localhost:3001', 'cyan');
   log('   App A - Admin: http://localhost:3001/wp-admin', 'cyan');
   log(
-    '   App A - REST API: http://localhost:3001/wp-json/custom-api/v1/health',
+    '   App A - REST API: http://localhost:3001/index.php?rest_route=/custom-api/v1/health',
     'cyan',
   );
 
   log('   App B - WordPress: http://localhost:3002', 'cyan');
   log('   App B - Admin: http://localhost:3002/wp-admin', 'cyan');
   log(
-    '   App B - REST API: http://localhost:3002/wp-json/custom-api/v1/health',
+    '   App B - REST API: http://localhost:3002/index.php?rest_route=/custom-api/v1/health',
     'cyan',
   );
 
   log('   App C - WordPress: http://localhost:3003', 'cyan');
   log('   App C - Admin: http://localhost:3003/wp-admin', 'cyan');
   log(
-    '   App C - REST API: http://localhost:3003/wp-json/custom-api/v1/health',
+    '   App C - REST API: http://localhost:3003/index.php?rest_route=/custom-api/v1/health',
     'cyan',
   );
 
@@ -466,7 +466,7 @@ async function testAPI() {
   log('\n🎉 API testing completed for all apps!', 'green');
   log('\n💡 To test with authentication, you can use:', 'yellow');
   log(
-    'curl -H "X-WP-Nonce: YOUR_NONCE" http://localhost:3001/wp-json/custom-api/v1/health',
+    'curl -H "X-WP-Nonce: YOUR_NONCE" http://localhost:3001/index.php?rest_route=/custom-api/v1/health',
     'cyan',
   );
 }

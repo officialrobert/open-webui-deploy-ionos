@@ -83,3 +83,31 @@ __tests__/
 # Build artifacts
 dist/
 build/
+
+# Cache directories (will be copied from dependencies stage)
+node_modules/
+wp-content/plugins/custom-rest-api/node_modules/
+wp-content/plugins/custom-rest-api/dist/
+
+# Development files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore

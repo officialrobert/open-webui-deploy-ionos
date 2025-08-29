@@ -31,15 +31,75 @@ class CustomRestAPI
         add_action('rest_api_init', array($this, 'register_rest_routes'));
         add_action('wp_ajax_custom_api_action', array($this, 'handle_ajax_request'));
         add_action('wp_ajax_nopriv_custom_api_action', array($this, 'handle_ajax_request'));
-        
+
         // Ensure JSON content type for all REST API responses
         add_filter('rest_pre_serve_request', array($this, 'set_json_content_type'), 10, 4);
+        
+        // Prevent WordPress from serving HTML error pages for our API
+        add_action('rest_api_init', array($this, 'prevent_html_errors'));
+        
+        // Add CORS headers for API requests
+        add_action('rest_api_init', array($this, 'add_cors_headers'));
     }
 
     public function init()
     {
         // Load Node.js dependencies if available
         $this->load_node_dependencies();
+    }
+
+    public function prevent_html_errors()
+    {
+        // Prevent WordPress from serving HTML error pages for our custom API
+        if (strpos($_SERVER['REQUEST_URI'] ?? '', 'rest_route=/custom-api/v1/') !== false) {
+            // Disable WordPress error display for our API
+            if (!defined('WP_DEBUG_DISPLAY')) {
+                define('WP_DEBUG_DISPLAY', false);
+            }
+            
+            // Set error handler to return JSON
+            set_error_handler(array($this, 'json_error_handler'));
+        }
+    }
+
+    public function json_error_handler($errno, $errstr, $errfile, $errline)
+    {
+        // Only handle errors for our API endpoints
+        if (strpos($_SERVER['REQUEST_URI'] ?? '', 'rest_route=/custom-api/v1/') !== false) {
+            $error_response = array(
+                'success' => false,
+                'error' => array(
+                    'message' => $errstr,
+                    'file' => $errfile,
+                    'line' => $errline,
+                    'type' => $errno
+                ),
+                'timestamp' => current_time('c')
+            );
+            
+            header('Content-Type: application/json; charset=UTF-8');
+            http_response_code(500);
+            echo json_encode($error_response);
+            exit;
+        }
+        
+        return false; // Let PHP handle other errors
+    }
+
+    public function add_cors_headers()
+    {
+        // Add CORS headers for API requests
+        if (strpos($_SERVER['REQUEST_URI'] ?? '', 'rest_route=/custom-api/v1/') !== false) {
+            header('Access-Control-Allow-Origin: *');
+            header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+            header('Access-Control-Allow-Headers: Content-Type, X-WP-Nonce, Authorization');
+            
+            // Handle preflight requests
+            if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+                http_response_code(200);
+                exit;
+            }
+        }
     }
 
     public function enqueue_scripts()
@@ -64,7 +124,7 @@ class CustomRestAPI
         wp_localize_script('custom-rest-api-frontend', 'customApiAjax', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('custom_api_nonce'),
-            'rest_url' => rest_url('custom-api/v1/')
+            'rest_url' => home_url('/index.php?rest_route=/custom-api/v1/')
         ));
     }
 
@@ -83,7 +143,7 @@ class CustomRestAPI
     {
         // Add debugging
         error_log('Custom REST API: Registering routes...');
-        
+
         // Register REST API routes
         register_rest_route('custom-api/v1', '/health', array(
             'methods' => 'GET',
@@ -138,10 +198,27 @@ class CustomRestAPI
             'callback' => array($this, 'search_content'),
             'permission_callback' => '__return_true'
         ));
-        
+
         error_log('Custom REST API: Routes registered successfully');
     }
 
+    /**
+     * Helper method to create consistent JSON responses
+     */
+    private function create_json_response($data, $status_code = 200, $headers = array())
+    {
+        $response = new WP_REST_Response($data, $status_code);
+        
+        // Always set JSON content type
+        $response->header('Content-Type', 'application/json; charset=UTF-8');
+        
+        // Add additional headers
+        foreach ($headers as $key => $value) {
+            $response->header($key, $value);
+        }
+        
+        return $response;
+    }
 
     public function test_endpoint($request)
     {
@@ -152,13 +229,11 @@ class CustomRestAPI
             'plugin_loaded' => true,
             'wordpress_version' => get_bloginfo('version'),
             'rest_api_enabled' => true,
-            'endpoint' => '/wp-json/custom-api/v1/test',
+            'endpoint' => '/index.php?rest_route=/custom-api/v1/test',
             'method' => 'GET'
         );
 
-        $wp_response = new WP_REST_Response($response, 200);
-        $wp_response->header('Content-Type', 'application/json');
-        return $wp_response;
+        return $this->create_json_response($response, 200);
     }
 
     public function health_check($request)
@@ -169,362 +244,411 @@ class CustomRestAPI
             'service' => 'WordPress Custom REST API',
             'version' => CUSTOM_REST_API_VERSION,
             'wordpress_version' => get_bloginfo('version'),
-            'endpoint' => '/wp-json/custom-api/v1/health',
+            'endpoint' => '/index.php?rest_route=/custom-api/v1/health',
             'method' => 'GET'
         );
 
-        $wp_response = new WP_REST_Response($response, 200);
-        $wp_response->header('Content-Type', 'application/json');
-        return $wp_response;
+        return $this->create_json_response($response, 200);
     }
 
     public function get_posts($request)
     {
-        // Get query parameters
-        $per_page = $request->get_param('per_page') ?: 10;
-        $page = $request->get_param('page') ?: 1;
-        $category = $request->get_param('category');
-        $search = $request->get_param('search');
+        try {
+            // Get query parameters
+            $per_page = $request->get_param('per_page') ?: 10;
+            $page = $request->get_param('page') ?: 1;
+            $category = $request->get_param('category');
+            $search = $request->get_param('search');
 
-        // Build query args
-        $args = array(
-            'numberposts' => $per_page,
-            'post_status' => 'publish',
-            'offset' => ($page - 1) * $per_page
-        );
-
-        if ($category) {
-            $args['category_name'] = $category;
-        }
-
-        if ($search) {
-            $args['s'] = $search;
-        }
-
-        $posts = get_posts($args);
-        $total_posts = wp_count_posts('post')->publish;
-
-        $formatted_posts = array();
-        foreach ($posts as $post) {
-            $formatted_posts[] = array(
-                'id' => $post->ID,
-                'title' => $post->post_title,
-                'content' => wp_strip_all_tags($post->post_content),
-                'excerpt' => wp_strip_all_tags($post->post_excerpt ?: wp_trim_words($post->post_content, 55)),
-                'author' => get_the_author_meta('display_name', $post->post_author),
-                'author_id' => $post->post_author,
-                'created_at' => $post->post_date,
-                'modified_at' => $post->post_modified,
-                'permalink' => get_permalink($post->ID),
-                'featured_image' => get_the_post_thumbnail_url($post->ID, 'medium'),
-                'categories' => wp_get_post_categories($post->ID, array('fields' => 'names')),
-                'tags' => wp_get_post_tags($post->ID, array('fields' => 'names'))
+            // Build query args
+            $args = array(
+                'numberposts' => $per_page,
+                'post_status' => 'publish',
+                'offset' => ($page - 1) * $per_page
             );
-        }
 
-        $response = array(
-            'success' => true,
-            'data' => $formatted_posts,
-            'pagination' => array(
-                'current_page' => (int)$page,
-                'per_page' => (int)$per_page,
-                'total_posts' => $total_posts,
-                'total_pages' => ceil($total_posts / $per_page)
-            ),
-            'meta' => array(
-                'endpoint' => '/wp-json/custom-api/v1/posts',
-                'method' => 'GET',
+            if ($category) {
+                $args['category_name'] = $category;
+            }
+
+            if ($search) {
+                $args['s'] = $search;
+            }
+
+            $posts = get_posts($args);
+            $total_posts = wp_count_posts('post')->publish;
+
+            $formatted_posts = array();
+            foreach ($posts as $post) {
+                $formatted_posts[] = array(
+                    'id' => $post->ID,
+                    'title' => $post->post_title,
+                    'content' => wp_strip_all_tags($post->post_content),
+                    'excerpt' => wp_strip_all_tags($post->post_excerpt ?: wp_trim_words($post->post_content, 55)),
+                    'author' => get_the_author_meta('display_name', $post->post_author),
+                    'author_id' => $post->post_author,
+                    'created_at' => $post->post_date,
+                    'modified_at' => $post->post_modified,
+                    'permalink' => get_permalink($post->ID),
+                    'featured_image' => get_the_post_thumbnail_url($post->ID, 'medium'),
+                    'categories' => wp_get_post_categories($post->ID, array('fields' => 'names')),
+                    'tags' => wp_get_post_tags($post->ID, array('fields' => 'names'))
+                );
+            }
+
+            $response = array(
+                'success' => true,
+                'data' => $formatted_posts,
+                'pagination' => array(
+                    'current_page' => (int)$page,
+                    'per_page' => (int)$per_page,
+                    'total_posts' => $total_posts,
+                    'total_pages' => ceil($total_posts / $per_page)
+                ),
+                'meta' => array(
+                    'endpoint' => '/index.php?rest_route=/custom-api/v1/posts',
+                    'method' => 'GET',
+                    'timestamp' => current_time('c')
+                )
+            );
+
+            return $this->create_json_response($response, 200);
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
                 'timestamp' => current_time('c')
-            )
-        );
-
-        $wp_response = new WP_REST_Response($response, 200);
-        $wp_response->header('Content-Type', 'application/json');
-        return $wp_response;
+            );
+            return $this->create_json_response($error_response, 500);
+        }
     }
 
     public function get_users($request)
     {
-        // Get query parameters
-        $per_page = $request->get_param('per_page') ?: 10;
-        $page = $request->get_param('page') ?: 1;
-        $role = $request->get_param('role');
-        $search = $request->get_param('search');
+        try {
+            // Get query parameters
+            $per_page = $request->get_param('per_page') ?: 10;
+            $page = $request->get_param('page') ?: 1;
+            $role = $request->get_param('role');
+            $search = $request->get_param('search');
 
-        // Build query args
-        $args = array(
-            'number' => $per_page,
-            'offset' => ($page - 1) * $per_page
-        );
-
-        if ($role) {
-            $args['role'] = $role;
-        }
-
-        if ($search) {
-            $args['search'] = '*' . $search . '*';
-        }
-
-        $users = get_users($args);
-        $total_users = count_users()['total_users'];
-
-        $formatted_users = array();
-        foreach ($users as $user) {
-            $formatted_users[] = array(
-                'id' => $user->ID,
-                'username' => $user->user_login,
-                'email' => $user->user_email,
-                'display_name' => $user->display_name,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'role' => implode(', ', $user->roles),
-                'registered_date' => $user->user_registered,
-                'avatar' => get_avatar_url($user->ID, array('size' => 96)),
-                'profile_url' => get_author_posts_url($user->ID)
+            // Build query args
+            $args = array(
+                'number' => $per_page,
+                'offset' => ($page - 1) * $per_page
             );
-        }
 
-        $response = array(
-            'success' => true,
-            'data' => $formatted_users,
-            'pagination' => array(
-                'current_page' => (int)$page,
-                'per_page' => (int)$per_page,
-                'total_users' => $total_users,
-                'total_pages' => ceil($total_users / $per_page)
-            ),
-            'meta' => array(
-                'endpoint' => '/wp-json/custom-api/v1/users',
-                'method' => 'GET',
+            if ($role) {
+                $args['role'] = $role;
+            }
+
+            if ($search) {
+                $args['search'] = '*' . $search . '*';
+            }
+
+            $users = get_users($args);
+            $total_users = count_users()['total_users'];
+
+            $formatted_users = array();
+            foreach ($users as $user) {
+                $formatted_users[] = array(
+                    'id' => $user->ID,
+                    'username' => $user->user_login,
+                    'email' => $user->user_email,
+                    'display_name' => $user->display_name,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'role' => implode(', ', $user->roles),
+                    'registered_date' => $user->user_registered,
+                    'avatar' => get_avatar_url($user->ID, array('size' => 96)),
+                    'profile_url' => get_author_posts_url($user->ID)
+                );
+            }
+
+            $response = array(
+                'success' => true,
+                'data' => $formatted_users,
+                'pagination' => array(
+                    'current_page' => (int)$page,
+                    'per_page' => (int)$per_page,
+                    'total_users' => $total_users,
+                    'total_pages' => ceil($total_users / $per_page)
+                ),
+                'meta' => array(
+                    'endpoint' => '/index.php?rest_route=/custom-api/v1/users',
+                    'method' => 'GET',
+                    'timestamp' => current_time('c')
+                )
+            );
+
+            return $this->create_json_response($response, 200);
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
                 'timestamp' => current_time('c')
-            )
-        );
-
-        $wp_response = new WP_REST_Response($response, 200);
-        $wp_response->header('Content-Type', 'application/json');
-        return $wp_response;
+            );
+            return $this->create_json_response($error_response, 500);
+        }
     }
 
     public function get_node_data($request)
     {
-        // This endpoint simulates Node.js functionality
-        $node_data = array(
-            'success' => true,
-            'data' => array(
-                'message' => 'Node.js-like data from WordPress',
-                'timestamp' => time(),
-                'random_number' => rand(1, 1000),
-                'server_info' => array(
-                    'php_version' => PHP_VERSION,
-                    'wordpress_version' => get_bloginfo('version'),
-                    'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown',
-                    'memory_limit' => ini_get('memory_limit'),
-                    'max_execution_time' => ini_get('max_execution_time')
+        try {
+            // This endpoint simulates Node.js functionality
+            $node_data = array(
+                'success' => true,
+                'data' => array(
+                    'message' => 'Node.js-like data from WordPress',
+                    'timestamp' => time(),
+                    'random_number' => rand(1, 1000),
+                    'server_info' => array(
+                        'php_version' => PHP_VERSION,
+                        'wordpress_version' => get_bloginfo('version'),
+                        'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown',
+                        'memory_limit' => ini_get('memory_limit'),
+                        'max_execution_time' => ini_get('max_execution_time')
+                    ),
+                    'wordpress_info' => array(
+                        'site_title' => get_bloginfo('name'),
+                        'site_description' => get_bloginfo('description'),
+                        'site_url' => get_site_url(),
+                        'admin_email' => get_option('admin_email'),
+                        'timezone' => get_option('timezone_string'),
+                        'date_format' => get_option('date_format'),
+                        'time_format' => get_option('time_format')
+                    )
                 ),
-                'wordpress_info' => array(
-                    'site_title' => get_bloginfo('name'),
-                    'site_description' => get_bloginfo('description'),
-                    'site_url' => get_site_url(),
-                    'admin_email' => get_option('admin_email'),
-                    'timezone' => get_option('timezone_string'),
-                    'date_format' => get_option('date_format'),
-                    'time_format' => get_option('time_format')
+                'meta' => array(
+                    'endpoint' => '/index.php?rest_route=/custom-api/v1/node-data',
+                    'method' => 'GET',
+                    'timestamp' => current_time('c')
                 )
-            ),
-            'meta' => array(
-                'endpoint' => '/wp-json/custom-api/v1/node-data',
-                'method' => 'GET',
-                'timestamp' => current_time('c')
-            )
-        );
+            );
 
-        $wp_response = new WP_REST_Response($node_data, 200);
-        $wp_response->header('Content-Type', 'application/json');
-        return $wp_response;
+            return $this->create_json_response($node_data, 200);
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
+                'timestamp' => current_time('c')
+            );
+            return $this->create_json_response($error_response, 500);
+        }
     }
 
     public function get_categories($request)
     {
-        $categories = get_categories(array(
-            'hide_empty' => false,
-            'orderby' => 'name',
-            'order' => 'ASC'
-        ));
+        try {
+            $categories = get_categories(array(
+                'hide_empty' => false,
+                'orderby' => 'name',
+                'order' => 'ASC'
+            ));
 
-        $formatted_categories = array();
-        foreach ($categories as $category) {
-            $formatted_categories[] = array(
-                'id' => $category->term_id,
-                'name' => $category->name,
-                'slug' => $category->slug,
-                'description' => $category->description,
-                'count' => $category->count,
-                'link' => get_category_link($category->term_id)
+            $formatted_categories = array();
+            foreach ($categories as $category) {
+                $formatted_categories[] = array(
+                    'id' => $category->term_id,
+                    'name' => $category->name,
+                    'slug' => $category->slug,
+                    'description' => $category->description,
+                    'count' => $category->count,
+                    'link' => get_category_link($category->term_id)
+                );
+            }
+
+            $response = array(
+                'success' => true,
+                'data' => $formatted_categories,
+                'meta' => array(
+                    'endpoint' => '/index.php?rest_route=/custom-api/v1/categories',
+                    'method' => 'GET',
+                    'timestamp' => current_time('c'),
+                    'total_categories' => count($formatted_categories)
+                )
             );
+
+            return $this->create_json_response($response, 200);
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
+                'timestamp' => current_time('c')
+            );
+            return $this->create_json_response($error_response, 500);
         }
-
-        $response = array(
-            'success' => true,
-            'data' => $formatted_categories,
-            'meta' => array(
-                'endpoint' => '/wp-json/custom-api/v1/categories',
-                'method' => 'GET',
-                'timestamp' => current_time('c'),
-                'total_categories' => count($formatted_categories)
-            )
-        );
-
-        $wp_response = new WP_REST_Response($response, 200);
-        $wp_response->header('Content-Type', 'application/json');
-        return $wp_response;
     }
 
     public function get_single_post($request)
     {
-        $post_id = $request->get_param('id');
-        $post = get_post($post_id);
+        try {
+            $post_id = $request->get_param('id');
+            $post = get_post($post_id);
 
-        if (!$post || $post->post_status !== 'publish') {
-            return new WP_Error(
-                'post_not_found',
-                'Post not found or not published',
-                array('status' => 404)
+            if (!$post || $post->post_status !== 'publish') {
+                $error_response = array(
+                    'success' => false,
+                    'error' => 'Post not found or not published',
+                    'timestamp' => current_time('c')
+                );
+                return $this->create_json_response($error_response, 404);
+            }
+
+            $response = array(
+                'success' => true,
+                'data' => array(
+                    'id' => $post->ID,
+                    'title' => $post->post_title,
+                    'content' => $post->post_content,
+                    'excerpt' => $post->post_excerpt ?: wp_trim_words($post->post_content, 55),
+                    'author' => get_the_author_meta('display_name', $post->post_author),
+                    'author_id' => $post->post_author,
+                    'created_at' => $post->post_date,
+                    'modified_at' => $post->post_modified,
+                    'permalink' => get_permalink($post->ID),
+                    'featured_image' => get_the_post_thumbnail_url($post->ID, 'full'),
+                    'categories' => wp_get_post_categories($post->ID, array('fields' => 'names')),
+                    'tags' => wp_get_post_tags($post->ID, array('fields' => 'names')),
+                    'comment_count' => $post->comment_count,
+                    'comment_status' => $post->comment_status
+                ),
+                'meta' => array(
+                    'endpoint' => '/index.php?rest_route=/custom-api/v1/post/' . $post_id,
+                    'method' => 'GET',
+                    'timestamp' => current_time('c')
+                )
             );
-        }
 
-        $response = array(
-            'success' => true,
-            'data' => array(
-                'id' => $post->ID,
-                'title' => $post->post_title,
-                'content' => $post->post_content,
-                'excerpt' => $post->post_excerpt ?: wp_trim_words($post->post_content, 55),
-                'author' => get_the_author_meta('display_name', $post->post_author),
-                'author_id' => $post->post_author,
-                'created_at' => $post->post_date,
-                'modified_at' => $post->post_modified,
-                'permalink' => get_permalink($post->ID),
-                'featured_image' => get_the_post_thumbnail_url($post->ID, 'full'),
-                'categories' => wp_get_post_categories($post->ID, array('fields' => 'names')),
-                'tags' => wp_get_post_tags($post->ID, array('fields' => 'names')),
-                'comment_count' => $post->comment_count,
-                'comment_status' => $post->comment_status
-            ),
-            'meta' => array(
-                'endpoint' => '/wp-json/custom-api/v1/post/' . $post_id,
-                'method' => 'GET',
+            return $this->create_json_response($response, 200);
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
                 'timestamp' => current_time('c')
-            )
-        );
-
-        $wp_response = new WP_REST_Response($response, 200);
-        $wp_response->header('Content-Type', 'application/json');
-        return $wp_response;
+            );
+            return $this->create_json_response($error_response, 500);
+        }
     }
 
     public function get_stats($request)
     {
-        $stats = array(
-            'posts' => array(
-                'total' => wp_count_posts('post')->publish,
-                'draft' => wp_count_posts('post')->draft,
-                'pending' => wp_count_posts('post')->pending
-            ),
-            'pages' => array(
-                'total' => wp_count_posts('page')->publish,
-                'draft' => wp_count_posts('page')->draft
-            ),
-            'users' => count_users()['total_users'],
-            'categories' => wp_count_terms('category'),
-            'tags' => wp_count_terms('post_tag'),
-            'comments' => array(
-                'total' => wp_count_comments()->total_comments,
-                'approved' => wp_count_comments()->approved,
-                'pending' => wp_count_comments()->moderated
-            )
-        );
+        try {
+            $stats = array(
+                'posts' => array(
+                    'total' => wp_count_posts('post')->publish,
+                    'draft' => wp_count_posts('post')->draft,
+                    'pending' => wp_count_posts('post')->pending
+                ),
+                'pages' => array(
+                    'total' => wp_count_posts('page')->publish,
+                    'draft' => wp_count_posts('page')->draft
+                ),
+                'users' => count_users()['total_users'],
+                'categories' => wp_count_terms('category'),
+                'tags' => wp_count_terms('post_tag'),
+                'comments' => array(
+                    'total' => wp_count_comments()->total_comments,
+                    'approved' => wp_count_comments()->approved,
+                    'pending' => wp_count_comments()->moderated
+                )
+            );
 
-        $response = array(
-            'success' => true,
-            'data' => $stats,
-            'meta' => array(
-                'endpoint' => '/wp-json/custom-api/v1/stats',
-                'method' => 'GET',
+            $response = array(
+                'success' => true,
+                'data' => $stats,
+                'meta' => array(
+                    'endpoint' => '/index.php?rest_route=/custom-api/v1/stats',
+                    'method' => 'GET',
+                    'timestamp' => current_time('c')
+                )
+            );
+
+            return $this->create_json_response($response, 200);
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
                 'timestamp' => current_time('c')
-            )
-        );
-
-        $wp_response = new WP_REST_Response($response, 200);
-        $wp_response->header('Content-Type', 'application/json');
-        return $wp_response;
+            );
+            return $this->create_json_response($error_response, 500);
+        }
     }
 
     public function search_content($request)
     {
-        $query = $request->get_param('q');
-        $type = $request->get_param('type') ?: 'post';
-        $per_page = $request->get_param('per_page') ?: 10;
-        $page = $request->get_param('page') ?: 1;
+        try {
+            $query = $request->get_param('q');
+            $type = $request->get_param('type') ?: 'post';
+            $per_page = $request->get_param('per_page') ?: 10;
+            $page = $request->get_param('page') ?: 1;
 
-        if (!$query) {
-            return new WP_Error(
-                'missing_query',
-                'Search query parameter "q" is required',
-                array('status' => 400)
-            );
-        }
-
-        $args = array(
-            's' => $query,
-            'post_type' => $type,
-            'post_status' => 'publish',
-            'posts_per_page' => $per_page,
-            'paged' => $page
-        );
-
-        $search_query = new WP_Query($args);
-        $results = array();
-
-        if ($search_query->have_posts()) {
-            while ($search_query->have_posts()) {
-                $search_query->the_post();
-                $post = get_post();
-                
-                $results[] = array(
-                    'id' => $post->ID,
-                    'title' => $post->post_title,
-                    'excerpt' => wp_trim_words($post->post_content, 30),
-                    'type' => $post->post_type,
-                    'permalink' => get_permalink($post->ID),
-                    'author' => get_the_author_meta('display_name', $post->post_author),
-                    'created_at' => $post->post_date
+            if (!$query) {
+                $error_response = array(
+                    'success' => false,
+                    'error' => 'Search query parameter "q" is required',
+                    'timestamp' => current_time('c')
                 );
+                return $this->create_json_response($error_response, 400);
             }
-        }
 
-        wp_reset_postdata();
+            $args = array(
+                's' => $query,
+                'post_type' => $type,
+                'post_status' => 'publish',
+                'posts_per_page' => $per_page,
+                'paged' => $page
+            );
 
-        $response = array(
-            'success' => true,
-            'data' => $results,
-            'pagination' => array(
-                'current_page' => (int)$page,
-                'per_page' => (int)$per_page,
-                'total_results' => $search_query->found_posts,
-                'total_pages' => $search_query->max_num_pages
-            ),
-            'meta' => array(
-                'endpoint' => '/wp-json/custom-api/v1/search',
-                'method' => 'GET',
-                'query' => $query,
-                'type' => $type,
+            $search_query = new WP_Query($args);
+            $results = array();
+
+            if ($search_query->have_posts()) {
+                while ($search_query->have_posts()) {
+                    $search_query->the_post();
+                    $post = get_post();
+
+                    $results[] = array(
+                        'id' => $post->ID,
+                        'title' => $post->post_title,
+                        'excerpt' => wp_trim_words($post->post_content, 30),
+                        'type' => $post->post_type,
+                        'permalink' => get_permalink($post->ID),
+                        'author' => get_the_author_meta('display_name', $post->post_author),
+                        'created_at' => $post->post_date
+                    );
+                }
+            }
+
+            wp_reset_postdata();
+
+            $response = array(
+                'success' => true,
+                'data' => $results,
+                'pagination' => array(
+                    'current_page' => (int)$page,
+                    'per_page' => (int)$per_page,
+                    'total_results' => $search_query->found_posts,
+                    'total_pages' => $search_query->max_num_pages
+                ),
+                'meta' => array(
+                    'endpoint' => '/index.php?rest_route=/custom-api/v1/search',
+                    'method' => 'GET',
+                    'query' => $query,
+                    'type' => $type,
+                    'timestamp' => current_time('c')
+                )
+            );
+
+            return $this->create_json_response($response, 200);
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
                 'timestamp' => current_time('c')
-            )
-        );
-
-        $wp_response = new WP_REST_Response($response, 200);
-        $wp_response->header('Content-Type', 'application/json');
-        return $wp_response;
+            );
+            return $this->create_json_response($error_response, 500);
+        }
     }
 
     public function handle_ajax_request()
@@ -592,6 +716,11 @@ class CustomRestAPI
         // Check if this is our custom API endpoint
         if (strpos($request->get_route(), 'custom-api/v1') !== false) {
             header('Content-Type: application/json; charset=UTF-8');
+            
+            // Prevent WordPress from outputting anything else
+            if (!headers_sent()) {
+                header('X-Content-Type-Options: nosniff');
+            }
         }
         return $served;
     }

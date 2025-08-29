@@ -1,295 +1,302 @@
-# Custom REST API WordPress Plugin
+# Custom REST API Plugin for WordPress
 
-A WordPress plugin that provides a custom REST API with TypeScript/Node.js-like functionality integrated directly into WordPress.
+A custom REST API plugin for WordPress that provides Node.js-like functionality and ensures all endpoints return proper JSON responses.
 
-## 🏗️ Features
+## Features
 
-- **WordPress REST API Integration**: Custom endpoints using WordPress REST API framework
-- **TypeScript Support**: Full TypeScript compilation and development workflow
-- **Node.js-like Functionality**: Utilities and patterns similar to Node.js development
-- **AJAX Support**: Client-side AJAX functionality for dynamic interactions
-- **Admin Dashboard**: WordPress admin panel integration with status monitoring
-- **Responsive Design**: Modern, responsive UI components
+- ✅ **Guaranteed JSON Responses**: All endpoints return proper JSON with correct content-type headers
+- ✅ **Error Handling**: Comprehensive error handling with JSON error responses
+- ✅ **CORS Support**: Built-in CORS headers for cross-origin requests
+- ✅ **TypeScript Support**: Written in TypeScript with Node.js-like utilities
+- ✅ **WordPress Integration**: Seamless integration with WordPress REST API
+- ✅ **Bridge Middleware**: Acts as a bridge between WordPress and Node.js-style API handlers
 
-## 📁 Plugin Structure
+## Installation
+
+1. Upload the plugin to your WordPress plugins directory
+2. Activate the plugin in WordPress admin
+3. The API endpoints will be available using the direct REST API format
+
+## API Endpoints
+
+### Base URL Format
+Since this plugin is designed to work reliably across different server configurations, use the direct REST API format:
 
 ```
-custom-rest-api/
-├── custom-rest-api.php      # Main plugin file
-├── package.json             # Node.js dependencies
-├── tsconfig.json           # TypeScript configuration
-├── src/
-│   └── api.ts              # TypeScript API implementation
-├── assets/
-│   ├── css/
-│   │   └── style.css       # Plugin styles
-│   └── js/
-│       ├── frontend.js     # Frontend JavaScript
-│       └── admin.js        # Admin panel JavaScript
-├── dist/                   # Compiled JavaScript (auto-generated)
-└── README.md              # This file
-```
-
-## 🚀 Installation
-
-### 1. Install the Plugin
-
-1. Copy the `custom-rest-api` folder to your WordPress `wp-content/plugins/` directory
-2. Activate the plugin in WordPress admin panel
-3. The plugin will automatically register REST API endpoints
-
-### 2. Build TypeScript (Development)
-
-```bash
-# Navigate to plugin directory
-cd wp-content/plugins/custom-rest-api
-
-# Install dependencies
-npm install
-
-# Build TypeScript
-npm run build
-
-# Watch for changes (development)
-npm run watch
-```
-
-## 🔧 API Endpoints
-
-The plugin provides the following REST API endpoints:
-
-### Base URL
-```
-/wp-json/custom-api/v1/
+http://your-site.com/index.php?rest_route=/custom-api/v1/
 ```
 
 ### Available Endpoints
 
-- `GET /health` - Health check and status information
-- `GET /posts` - Get WordPress posts
-- `GET /users` - Get WordPress users
-- `GET /node-data` - Node.js-like data simulation
-
-### Example Usage
-
-```javascript
-// Health check
-fetch('/wp-json/custom-api/v1/health')
-  .then(response => response.json())
-  .then(data => console.log(data));
-
-// Get posts
-fetch('/wp-json/custom-api/v1/posts')
-  .then(response => response.json())
-  .then(posts => console.log(posts));
+#### Health Check
 ```
-
-## 🎨 Frontend Integration
-
-### Using the Plugin's JavaScript
-
-The plugin automatically loads frontend JavaScript that provides:
-
-- API connection testing
-- Form handling
-- Data display utilities
-- Notification system
-
-### Example HTML
-
-```html
-<!-- Test API Connection -->
-<button class="custom-api-test">Test API Connection</button>
-<div class="api-status">Checking...</div>
-
-<!-- Display Posts -->
-<div class="posts-container"></div>
-
-<!-- Display Users -->
-<div class="users-container"></div>
-
-<!-- Custom Form -->
-<form class="custom-api-form">
-    <div class="form-group">
-        <label for="name">Name:</label>
-        <input type="text" id="name" name="name" required>
-    </div>
-    <button type="submit">Submit</button>
-</form>
+GET /index.php?rest_route=/custom-api/v1/health
 ```
+Returns the health status of the API.
 
-## 🔧 Development
-
-### Adding New Endpoints
-
-1. Edit `custom-rest-api.php`
-2. Add new route in `register_rest_routes()` method:
-
-```php
-register_rest_route('custom-api/v1', '/new-endpoint', array(
-    'methods' => 'GET',
-    'callback' => array($this, 'new_endpoint_handler'),
-    'permission_callback' => '__return_true'
-));
+#### Test Endpoint
 ```
-
-3. Add the handler method:
-
-```php
-public function new_endpoint_handler($request) {
-    return array(
-        'message' => 'New endpoint response',
-        'timestamp' => current_time('c')
-    );
-}
+GET /index.php?rest_route=/custom-api/v1/test
 ```
+Basic test endpoint to verify the API is working.
 
-### TypeScript Development
-
-1. Edit `src/api.ts`
-2. Add new functionality using Node.js-like patterns
-3. Build with `npm run build`
-4. The compiled JavaScript will be automatically loaded by WordPress
-
-### Adding New Dependencies
-
-1. Edit `package.json`
-2. Add new dependencies
-3. Run `npm install`
-4. Import and use in `src/api.ts`
-
-## 🎛️ Admin Panel
-
-The plugin provides admin panel functionality:
-
-- **Dashboard Widget**: Shows API status and quick actions
-- **Settings Page**: Configure plugin options
-- **Status Monitoring**: Real-time API health monitoring
-- **Cache Management**: Clear API cache
-
-### Admin Features
-
-- Test API connections
-- View API statistics
-- Export API data
-- Monitor system status
-
-## 🔒 Security
-
-- **Nonce Verification**: All AJAX requests use WordPress nonces
-- **Permission Callbacks**: REST API endpoints include permission checks
-- **Input Sanitization**: All user inputs are properly sanitized
-- **Output Escaping**: All outputs are properly escaped
-
-## 🎨 Styling
-
-The plugin includes comprehensive CSS styling:
-
-- **Status Indicators**: Visual API status indicators
-- **Notifications**: Toast-style notifications
-- **Forms**: Styled form elements
-- **Responsive Design**: Mobile-friendly layouts
-- **Admin Integration**: WordPress admin panel styling
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Plugin Not Activating**
-   - Check PHP version (requires PHP 7.4+)
-   - Verify file permissions
-   - Check for syntax errors in plugin files
-
-2. **REST API Not Working**
-   - Ensure WordPress REST API is enabled
-   - Check permalink settings
-   - Verify .htaccess configuration
-
-3. **TypeScript Build Errors**
-   - Run `npm install` to install dependencies
-   - Check TypeScript configuration
-   - Verify Node.js version (requires 14+)
-
-4. **AJAX Not Working**
-   - Check browser console for JavaScript errors
-   - Verify nonce is being generated correctly
-   - Check WordPress AJAX URL configuration
-
-### Debug Mode
-
-Enable WordPress debug mode to see detailed error messages:
-
-```php
-// In wp-config.php
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);
+#### Posts
 ```
+GET /index.php?rest_route=/custom-api/v1/posts
+GET /index.php?rest_route=/custom-api/v1/posts?per_page=10&page=1&category=news&search=wordpress
+```
+Returns WordPress posts with pagination and filtering options.
 
-## 📚 API Reference
+#### Users
+```
+GET /index.php?rest_route=/custom-api/v1/users
+GET /index.php?rest_route=/custom-api/v1/users?per_page=10&page=1&role=administrator&search=admin
+```
+Returns WordPress users with pagination and filtering options.
 
-### REST API Response Format
+#### Node Data
+```
+GET /index.php?rest_route=/custom-api/v1/node-data
+```
+Returns Node.js-like data including server information and WordPress details.
 
-All API responses follow this format:
+#### Categories
+```
+GET /index.php?rest_route=/custom-api/v1/categories
+```
+Returns all WordPress categories.
+
+#### Single Post
+```
+GET /index.php?rest_route=/custom-api/v1/post/{id}
+```
+Returns a single post by ID.
+
+#### Stats
+```
+GET /index.php?rest_route=/custom-api/v1/stats
+```
+Returns WordPress site statistics.
+
+#### Search
+```
+GET /index.php?rest_route=/custom-api/v1/search?q=search_term&type=post&per_page=10&page=1
+```
+Search WordPress content.
+
+## Response Format
+
+All endpoints return responses in this consistent format:
 
 ```json
 {
   "success": true,
-  "data": {
-    // Response data
-  },
-  "timestamp": "2023-12-01T10:00:00Z"
+  "data": [...],
+  "meta": {
+    "endpoint": "/custom-api/v1/endpoint",
+    "method": "GET",
+    "timestamp": "2024-01-01T00:00:00+00:00"
+  }
 }
 ```
 
-### Error Response Format
+Error responses:
 
 ```json
 {
   "success": false,
   "error": "Error message",
-  "timestamp": "2023-12-01T10:00:00Z"
+  "timestamp": "2024-01-01T00:00:00+00:00"
 }
 ```
 
-### AJAX Response Format
+## Testing
 
-```json
-{
-  "success": true,
-  "message": "Success message",
-  "data": {
-    // Response data
+### Using PowerShell (Windows)
+```powershell
+# Test health endpoint
+Invoke-RestMethod -Uri "http://localhost:3001/index.php?rest_route=/custom-api/v1/health" -Method GET
+
+# Test posts endpoint
+Invoke-RestMethod -Uri "http://localhost:3001/index.php?rest_route=/custom-api/v1/posts" -Method GET
+
+# Test with parameters
+Invoke-RestMethod -Uri "http://localhost:3001/index.php?rest_route=/custom-api/v1/posts?per_page=3" -Method GET
+```
+
+### Using curl
+```bash
+# Test health endpoint
+curl "http://your-site.com/index.php?rest_route=/custom-api/v1/health"
+
+# Test posts endpoint
+curl "http://your-site.com/index.php?rest_route=/custom-api/v1/posts"
+
+# Test with parameters
+curl "http://your-site.com/index.php?rest_route=/custom-api/v1/posts?per_page=3"
+```
+
+### Using JavaScript/Fetch
+```javascript
+// Test health endpoint
+fetch('http://your-site.com/index.php?rest_route=/custom-api/v1/health')
+  .then(response => response.json())
+  .then(data => console.log(data));
+
+// Test posts endpoint
+fetch('http://your-site.com/index.php?rest_route=/custom-api/v1/posts')
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+## Integration with Node.js Applications
+
+This plugin is designed to act as a bridge middleware between WordPress and Node.js-style API handlers. The plugin ensures:
+
+1. **Consistent JSON Responses**: All endpoints return proper JSON with correct content-type headers
+2. **Error Handling**: Comprehensive error handling that returns JSON error responses
+3. **CORS Support**: Built-in CORS headers for cross-origin requests
+4. **WordPress Integration**: Seamless access to WordPress data and functionality
+
+### Example Node.js Integration
+```javascript
+const axios = require('axios');
+
+class WordPressAPI {
+  constructor(baseUrl) {
+    this.baseUrl = baseUrl;
+  }
+
+  async getHealth() {
+    const response = await axios.get(`${this.baseUrl}/index.php?rest_route=/custom-api/v1/health`);
+    return response.data;
+  }
+
+  async getPosts(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const url = `${this.baseUrl}/index.php?rest_route=/custom-api/v1/posts${queryString ? '&' + queryString : ''}`;
+    const response = await axios.get(url);
+    return response.data;
+  }
+
+  async getUsers(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const url = `${this.baseUrl}/index.php?rest_route=/custom-api/v1/users${queryString ? '&' + queryString : ''}`;
+    const response = await axios.get(url);
+    return response.data;
   }
 }
+
+// Usage
+const wpAPI = new WordPressAPI('http://your-site.com');
+const health = await wpAPI.getHealth();
+const posts = await wpAPI.getPosts({ per_page: 5 });
 ```
 
-## 🤝 Contributing
+## Development
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+### Building TypeScript
 
-## 📄 License
+The plugin includes TypeScript source files. To build:
 
-This plugin is licensed under the MIT License.
+```bash
+cd wp-content/plugins/custom-rest-api
+npm install
+npm run build
+```
 
-## 🆘 Support
+### Adding New Endpoints
 
-For support and questions:
+1. Add the endpoint method to the `CustomRestAPI` class
+2. Register the route in the `register_rest_routes` method
+3. Use the `create_json_response` helper method for consistent responses
 
-1. Check the troubleshooting section
-2. Review WordPress error logs
-3. Test with default WordPress theme
-4. Disable other plugins to check for conflicts
+Example:
+```php
+public function my_new_endpoint($request) {
+    try {
+        $data = array(
+            'message' => 'Hello from new endpoint',
+            'timestamp' => current_time('c')
+        );
+        
+        return $this->create_json_response($data, 200);
+    } catch (Exception $e) {
+        $error_response = array(
+            'success' => false,
+            'error' => $e->getMessage(),
+            'timestamp' => current_time('c')
+        );
+        return $this->create_json_response($error_response, 500);
+    }
+}
+```
 
-## 🔄 Updates
+## Troubleshooting
 
-To update the plugin:
+### Issue: Getting HTML instead of JSON
 
-1. Backup your current installation
-2. Replace plugin files with new version
-3. Run `npm install` if dependencies changed
-4. Run `npm run build` to rebuild TypeScript
-5. Test functionality
+If you're getting HTML responses, ensure you're using the correct URL format:
+
+**✅ Correct format:**
+```
+http://your-site.com/index.php?rest_route=/custom-api/v1/health
+```
+
+**❌ May not work:**
+```
+http://your-site.com/index.php?rest_route=/custom-api/v1/health
+```
+
+### Common Solutions
+
+1. **Use Direct REST API Format**: Always use `index.php?rest_route=` format for reliable results
+2. **Check Plugin Activation**: Ensure the plugin is activated in WordPress admin
+3. **Clear Cache**: Clear any caching plugins or server cache
+4. **Check Error Logs**: Check WordPress and server error logs
+
+### Debug Steps
+
+1. Enable WordPress debug mode in `wp-config.php`:
+```php
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
+```
+
+2. Test the basic WordPress REST API:
+```bash
+curl "http://your-site.com/index.php?rest_route=/"
+```
+
+3. Test your custom endpoint:
+```bash
+curl "http://your-site.com/index.php?rest_route=/custom-api/v1/health"
+```
+
+## Security
+
+- All endpoints use WordPress nonces for authentication
+- CORS headers are properly configured
+- Error messages don't expose sensitive information
+- Input validation and sanitization are implemented
+
+## Support
+
+If you encounter issues:
+
+1. Verify you're using the correct URL format (`index.php?rest_route=`)
+2. Check that the plugin is activated
+3. Test with the basic WordPress REST API first
+4. Check WordPress error logs
+5. Ensure all requirements are met
+
+## Requirements
+
+- WordPress 5.0 or higher
+- PHP 7.4 or higher
+- REST API enabled (default in WordPress)
+
+## License
+
+MIT License - see LICENSE file for details.

@@ -128,6 +128,12 @@ npm run install:plugin
 ```bash
 # Clean Docker system and volumes
 npm run clean:all
+
+# Build cache manually (optional - cache is built automatically on first run)
+npm run build:cache
+
+# Clean build cache
+npm run build:cache:clean
 ```
 
 ## 🏥 Health Monitoring
@@ -213,24 +219,24 @@ docker-compose exec db mysql -u wordpress -pwordpress_password -e "SHOW TABLES;"
 
 ```bash
 # Health check for all apps
-curl http://localhost:3001/wp-json/custom-api/v1/health
-curl http://localhost:3002/wp-json/custom-api/v1/health
-curl http://localhost:3003/wp-json/custom-api/v1/health
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/health"
+curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/health"
+curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/health"
 
 # Get posts from all apps
-curl http://localhost:3001/wp-json/custom-api/v1/posts
-curl http://localhost:3002/wp-json/custom-api/v1/posts
-curl http://localhost:3003/wp-json/custom-api/v1/posts
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/posts"
+curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/posts"
+curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/posts"
 
 # Get users from all apps
-curl http://localhost:3001/wp-json/custom-api/v1/users
-curl http://localhost:3002/wp-json/custom-api/v1/users
-curl http://localhost:3003/wp-json/custom-api/v1/users
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/users"
+curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/users"
+curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/users"
 
 # Get Node.js-like data from all apps
-curl http://localhost:3001/wp-json/custom-api/v1/node-data
-curl http://localhost:3002/wp-json/custom-api/v1/node-data
-curl http://localhost:3003/wp-json/custom-api/v1/node-data
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/node-data"
+curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/node-data"
+curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/node-data"
 ```
 
 ## 🌐 Access Points
@@ -240,13 +246,13 @@ Once the environment is running, you can access:
 ### Full Stack Environment
 - **App A - WordPress**: http://localhost:3001
 - **App A - Admin**: http://localhost:3001/wp-admin
-- **App A - REST API**: http://localhost:3001/wp-json/custom-api/v1/health
+- **App A - REST API**: http://localhost:3001/index.php?rest_route=/custom-api/v1/health
 - **App B - WordPress**: http://localhost:3002
 - **App B - Admin**: http://localhost:3002/wp-admin
-- **App B - REST API**: http://localhost:3002/wp-json/custom-api/v1/health
+- **App B - REST API**: http://localhost:3002/index.php?rest_route=/custom-api/v1/health
 - **App C - WordPress**: http://localhost:3003
 - **App C - Admin**: http://localhost:3003/wp-admin
-- **App C - REST API**: http://localhost:3003/wp-json/custom-api/v1/health
+- **App C - REST API**: http://localhost:3003/index.php?rest_route=/custom-api/v1/health
 - **phpMyAdmin**: http://localhost:8081
 - **MySQL Database**: localhost:3307
 
@@ -282,9 +288,43 @@ The plugin source is available for editing:
 npm run test-api
 
 # Or manually test in browser
-curl http://localhost:3001/wp-json/custom-api/v1/health
-curl http://localhost:3002/wp-json/custom-api/v1/health
-curl http://localhost:3003/wp-json/custom-api/v1/health
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/health"
+curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/health"
+curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/health"
+```
+
+## 🚀 Build Optimization
+
+### Multi-Stage Docker Build
+
+This project uses a multi-stage Docker build to optimize build times across multiple WordPress instances:
+
+#### Build Stages
+
+1. **Base Stage** (`base`): Contains system dependencies, PHP extensions, Node.js, and WP-CLI
+2. **WordPress Base Stage** (`wordpress-base`): Contains WordPress core files and Apache configuration  
+3. **Dependencies Stage** (`dependencies`): Installs Node.js dependencies for the main app and plugin
+4. **App Stage** (`app`): Final stage with all application files and dependencies
+
+#### Benefits
+
+- ✅ **Shared Dependencies**: System packages, PHP extensions, and Node.js are installed once and reused
+- ✅ **Cached Layers**: WordPress core files and dependencies are cached across builds
+- ✅ **Faster Builds**: Subsequent builds only rebuild changed application files
+- ✅ **Smaller Images**: Each stage only contains what's needed for that layer
+- ✅ **Consistent Builds**: All WordPress instances use the same base layers
+
+#### Cache Management
+
+```bash
+# Cache is built automatically on first run
+# Manual cache management (optional):
+
+# Build cache manually
+npm run build:cache
+
+# Clean build cache
+npm run build:cache:clean
 ```
 
 ## 🐳 Docker Configuration Details
@@ -395,9 +435,9 @@ cat ./logs/app_a/error.log
 npm run health
 
 # Check service health for all apps
-docker-compose exec app_a curl -f http://localhost/wp-json/custom-api/v1/health
-docker-compose exec app_b curl -f http://localhost/wp-json/custom-api/v1/health
-docker-compose exec app_c curl -f http://localhost/wp-json/custom-api/v1/health
+docker-compose exec app_a curl -f "http://localhost/index.php?rest_route=/custom-api/v1/health"
+docker-compose exec app_b curl -f "http://localhost/index.php?rest_route=/custom-api/v1/health"
+docker-compose exec app_c curl -f "http://localhost/index.php?rest_route=/custom-api/v1/health"
 
 # Monitor logs
 npm run start:logs
@@ -410,9 +450,9 @@ npm run start:logs
 npm run health
 
 # Check WordPress performance for all apps
-curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3001/wp-json/custom-api/v1/health
-curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3002/wp-json/custom-api/v1/health
-curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3003/wp-json/custom-api/v1/health
+curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3001/index.php?rest_route=/custom-api/v1/health"
+curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3002/index.php?rest_route=/custom-api/v1/health"
+curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3003/index.php?rest_route=/custom-api/v1/health"
 ```
 
 ## 🔒 Security
@@ -476,10 +516,10 @@ npm run test-api
 
 ### Available Endpoints
 
-- `GET /wp-json/custom-api/v1/health` - Health check
-- `GET /wp-json/custom-api/v1/posts` - Get WordPress posts
-- `GET /wp-json/custom-api/v1/users` - Get WordPress users
-- `GET /wp-json/custom-api/v1/node-data` - Node.js-like data
+- `GET /index.php?rest_route=/custom-api/v1/health` - Health check
+- `GET /index.php?rest_route=/custom-api/v1/posts` - Get WordPress posts
+- `GET /index.php?rest_route=/custom-api/v1/users` - Get WordPress users
+- `GET /index.php?rest_route=/custom-api/v1/node-data` - Node.js-like data
 
 ### Response Format
 

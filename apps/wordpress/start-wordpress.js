@@ -485,7 +485,10 @@ async function main() {
     log(`\n🌐 WordPress Instance: ${instance}`, 'bright');
     log(`   WordPress: ${baseUrl}`, 'cyan');
     log(`   WordPress Admin: ${baseUrl}/wp-admin`, 'cyan');
-    log(`   Custom REST API: ${baseUrl}/wp-json/custom-api/v1/health`, 'cyan');
+    log(
+      `   Custom REST API: ${baseUrl}/index.php?rest_route=/custom-api/v1/health`,
+      'cyan',
+    );
 
     if (!skipDatabase) {
       log('   phpMyAdmin: http://localhost:8081', 'cyan');
