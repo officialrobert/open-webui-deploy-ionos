@@ -42,6 +42,18 @@ RUN docker-php-ext-install mysqli pdo pdo_mysql
 # Enable Apache modules
 RUN a2enmod rewrite
 
+# Copy package.json files FIRST for better caching (only rebuilds when dependencies change)
+COPY package.json /usr/local/bin/
+COPY wp-content/plugins/custom-rest-api/package.json /tmp/plugin-package.json
+
+# Install Node.js dependencies for the main application (cached layer)
+RUN cd /usr/local/bin && npm install
+
+# Install Node.js dependencies for the custom plugin (cached layer)
+RUN mkdir -p /tmp/plugin-deps && cd /tmp/plugin-deps \
+    && cp /tmp/plugin-package.json package.json \
+    && npm install
+
 # Download and extract WordPress
 RUN wget -O /tmp/wordpress.tar.gz https://wordpress.org/wordpress-${WORDPRESS_VERSION}.tar.gz \
     && tar -xzf /tmp/wordpress.tar.gz -C /tmp \
@@ -53,18 +65,14 @@ RUN cp -r /tmp/wordpress/* /var/www/html/ \
 
 # Copy custom files and scripts
 COPY start-wordpress.js /usr/local/bin/
-COPY package.json /usr/local/bin/
 COPY wp-config-sample.php /var/www/html/
-
-# Install Node.js dependencies for the main application
-RUN cd /usr/local/bin && npm install
 
 # Copy custom REST API plugin
 COPY wp-content/plugins/custom-rest-api /var/www/html/wp-content/plugins/custom-rest-api/
 
-# Install Node.js dependencies for the custom plugin
-RUN cd /var/www/html/wp-content/plugins/custom-rest-api \
-    && npm install \
+# Copy pre-installed plugin dependencies and build plugin (cached layer)
+RUN cp -r /tmp/plugin-deps/node_modules /var/www/html/wp-content/plugins/custom-rest-api/ \
+    && cd /var/www/html/wp-content/plugins/custom-rest-api \
     && npm run build
 
 # Install WP-CLI
