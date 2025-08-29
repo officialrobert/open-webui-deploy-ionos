@@ -1,18 +1,26 @@
 # Use official PHP Apache image with WordPress
 FROM php:8.2-apache
 
+# Build arguments for customization
+ARG APP_INSTANCE
+ARG APP_PORT
+ARG APP_TITLE
+ARG TABLE_PREFIX
+
 # Set environment variables
 ENV WORDPRESS_VERSION=6.8.2
 ENV WORDPRESS_DB_NAME=wordpress
 ENV WORDPRESS_DB_USER=wordpress
 ENV WORDPRESS_DB_PASSWORD=wordpress_password
 ENV WORDPRESS_DB_HOST=db:3306
-ENV WORDPRESS_TITLE="WordPress with Custom REST API"
+ENV WORDPRESS_TITLE="${APP_TITLE}"
 ENV WORDPRESS_ADMIN_USER=admin
 ENV WORDPRESS_ADMIN_PASSWORD=admin
 ENV WORDPRESS_ADMIN_EMAIL=admin@example.com
 ENV WORDPRESS_DEBUG=1
 ENV WORDPRESS_SKIP_DB=0
+ENV WORDPRESS_INSTANCE="${APP_INSTANCE}"
+ENV WORDPRESS_TABLE_PREFIX="${TABLE_PREFIX}"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
