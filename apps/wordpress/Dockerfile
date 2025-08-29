@@ -2,7 +2,7 @@
 FROM php:8.2-apache
 
 # Set environment variables
-ENV WORDPRESS_VERSION=6.4.2
+ENV WORDPRESS_VERSION=6.8.2
 ENV WORDPRESS_DB_NAME=wordpress
 ENV WORDPRESS_DB_USER=wordpress
 ENV WORDPRESS_DB_PASSWORD=wordpress_password
