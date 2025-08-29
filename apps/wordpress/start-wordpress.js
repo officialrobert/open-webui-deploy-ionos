@@ -55,7 +55,8 @@ function createWpConfig() {
     // Get environment variables with defaults
     const dbName = process.env.WORDPRESS_DB_NAME || 'wordpress';
     const dbUser = process.env.WORDPRESS_DB_USER || 'wordpress';
-    const dbPassword = process.env.WORDPRESS_DB_PASSWORD || 'wordpress_password';
+    const dbPassword =
+      process.env.WORDPRESS_DB_PASSWORD || 'wordpress_password';
     const dbHost = process.env.WORDPRESS_DB_HOST || 'db:3306';
     const tablePrefix = process.env.WORDPRESS_TABLE_PREFIX || 'wp_';
     const debug = process.env.WORDPRESS_DEBUG === '1';
@@ -106,14 +107,30 @@ define( 'DB_COLLATE', '' );
  *
  * @since 2.6.0
  */
-define( 'AUTH_KEY',         'demo-auth-key-${Date.now()}-${Math.random().toString(36).substr(2, 9)}' );
-define( 'SECURE_AUTH_KEY',  'demo-secure-auth-key-${Date.now()}-${Math.random().toString(36).substr(2, 9)}' );
-define( 'LOGGED_IN_KEY',    'demo-logged-in-key-${Date.now()}-${Math.random().toString(36).substr(2, 9)}' );
-define( 'NONCE_KEY',        'demo-nonce-key-${Date.now()}-${Math.random().toString(36).substr(2, 9)}' );
-define( 'AUTH_SALT',        'demo-auth-salt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}' );
-define( 'SECURE_AUTH_SALT', 'demo-secure-auth-salt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}' );
-define( 'LOGGED_IN_SALT',   'demo-logged-in-salt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}' );
-define( 'NONCE_SALT',       'demo-nonce-salt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}' );
+define( 'AUTH_KEY',         'demo-auth-key-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}' );
+define( 'SECURE_AUTH_KEY',  'demo-secure-auth-key-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}' );
+define( 'LOGGED_IN_KEY',    'demo-logged-in-key-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}' );
+define( 'NONCE_KEY',        'demo-nonce-key-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}' );
+define( 'AUTH_SALT',        'demo-auth-salt-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}' );
+define( 'SECURE_AUTH_SALT', 'demo-secure-auth-salt-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}' );
+define( 'LOGGED_IN_SALT',   'demo-logged-in-salt-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}' );
+define( 'NONCE_SALT',       'demo-nonce-salt-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}' );
 
 /**#@-*/
 
