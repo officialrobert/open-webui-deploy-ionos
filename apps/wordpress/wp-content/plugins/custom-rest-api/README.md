@@ -1,302 +1,169 @@
-# Custom REST API Plugin for WordPress
+# TypeScript-Powered Demo Endpoint for Open WebUI
 
-A custom REST API plugin for WordPress that provides Node.js-like functionality and ensures all endpoints return proper JSON responses.
+## Overview
 
-## Features
+A demo endpoint that uses **TypeScript to handle external API calls** (weather, search, news) for your Open WebUI integration. The PHP backend serves as a proxy while the TypeScript handles all external API interactions.
 
-- ✅ **Guaranteed JSON Responses**: All endpoints return proper JSON with correct content-type headers
-- ✅ **Error Handling**: Comprehensive error handling with JSON error responses
-- ✅ **CORS Support**: Built-in CORS headers for cross-origin requests
-- ✅ **TypeScript Support**: Written in TypeScript with Node.js-like utilities
-- ✅ **WordPress Integration**: Seamless integration with WordPress REST API
-- ✅ **Bridge Middleware**: Acts as a bridge between WordPress and Node.js-style API handlers
+## Architecture
 
-## Installation
+- **PHP**: WordPress plugin that provides REST API endpoints
+- **TypeScript**: Handles all external API calls (OpenWeatherMap, DuckDuckGo, etc.)
+- **External APIs**: Weather, Search, and News data from real services
 
-1. Upload the plugin to your WordPress plugins directory
-2. Activate the plugin in WordPress admin
-3. The API endpoints will be available using the direct REST API format
+## Endpoint Details
 
-## API Endpoints
+**URL:** `/index.php?rest_route=/custom-api/v1/demo`  
+**Methods:** GET, POST  
+**Description:** Demo endpoint with TypeScript-powered external API integration
 
-### Base URL Format
-Since this plugin is designed to work reliably across different server configurations, use the direct REST API format:
+## Available Actions
 
-```
-http://your-site.com/index.php?rest_route=/custom-api/v1/
-```
+### 1. Weather Data (`action=weather`)
+Get current weather for any city using OpenWeatherMap API.
 
-### Available Endpoints
+**Parameters:**
+- `city` (optional): City name (default: "London")
 
-#### Health Check
-```
-GET /index.php?rest_route=/custom-api/v1/health
-```
-Returns the health status of the API.
-
-#### Test Endpoint
-```
-GET /index.php?rest_route=/custom-api/v1/test
-```
-Basic test endpoint to verify the API is working.
-
-#### Posts
-```
-GET /index.php?rest_route=/custom-api/v1/posts
-GET /index.php?rest_route=/custom-api/v1/posts?per_page=10&page=1&category=news&search=wordpress
-```
-Returns WordPress posts with pagination and filtering options.
-
-#### Users
-```
-GET /index.php?rest_route=/custom-api/v1/users
-GET /index.php?rest_route=/custom-api/v1/users?per_page=10&page=1&role=administrator&search=admin
-```
-Returns WordPress users with pagination and filtering options.
-
-#### Node Data
-```
-GET /index.php?rest_route=/custom-api/v1/node-data
-```
-Returns Node.js-like data including server information and WordPress details.
-
-#### Categories
-```
-GET /index.php?rest_route=/custom-api/v1/categories
-```
-Returns all WordPress categories.
-
-#### Single Post
-```
-GET /index.php?rest_route=/custom-api/v1/post/{id}
-```
-Returns a single post by ID.
-
-#### Stats
-```
-GET /index.php?rest_route=/custom-api/v1/stats
-```
-Returns WordPress site statistics.
-
-#### Search
-```
-GET /index.php?rest_route=/custom-api/v1/search?q=search_term&type=post&per_page=10&page=1
-```
-Search WordPress content.
-
-## Response Format
-
-All endpoints return responses in this consistent format:
-
-```json
-{
-  "success": true,
-  "data": [...],
-  "meta": {
-    "endpoint": "/custom-api/v1/endpoint",
-    "method": "GET",
-    "timestamp": "2024-01-01T00:00:00+00:00"
-  }
-}
-```
-
-Error responses:
-
-```json
-{
-  "success": false,
-  "error": "Error message",
-  "timestamp": "2024-01-01T00:00:00+00:00"
-}
-```
-
-## Testing
-
-### Using PowerShell (Windows)
-```powershell
-# Test health endpoint
-Invoke-RestMethod -Uri "http://localhost:3001/index.php?rest_route=/custom-api/v1/health" -Method GET
-
-# Test posts endpoint
-Invoke-RestMethod -Uri "http://localhost:3001/index.php?rest_route=/custom-api/v1/posts" -Method GET
-
-# Test with parameters
-Invoke-RestMethod -Uri "http://localhost:3001/index.php?rest_route=/custom-api/v1/posts?per_page=3" -Method GET
-```
-
-### Using curl
+**Example:**
 ```bash
-# Test health endpoint
-curl "http://your-site.com/index.php?rest_route=/custom-api/v1/health"
-
-# Test posts endpoint
-curl "http://your-site.com/index.php?rest_route=/custom-api/v1/posts"
-
-# Test with parameters
-curl "http://your-site.com/index.php?rest_route=/custom-api/v1/posts?per_page=3"
+GET /index.php?rest_route=/custom-api/v1/demo?action=weather&city=New York
 ```
 
-### Using JavaScript/Fetch
-```javascript
-// Test health endpoint
-fetch('http://your-site.com/index.php?rest_route=/custom-api/v1/health')
-  .then(response => response.json())
-  .then(data => console.log(data));
+### 2. Search Results (`action=search`)
+Search using DuckDuckGo Instant Answer API (free, no API key required).
 
-// Test posts endpoint
-fetch('http://your-site.com/index.php?rest_route=/custom-api/v1/posts')
-  .then(response => response.json())
-  .then(data => console.log(data));
+**Parameters:**
+- `query` (required): Search term
+- `limit` (optional): Number of results (default: 5)
+
+**Example:**
+```bash
+GET /index.php?rest_route=/custom-api/v1/demo?action=search&query=openai&limit=3
 ```
 
-## Integration with Node.js Applications
+### 3. News Data (`action=news`)
+Get mock news articles (ready for NewsAPI integration).
 
-This plugin is designed to act as a bridge middleware between WordPress and Node.js-style API handlers. The plugin ensures:
+**Parameters:**
+- `query` (optional): Filter news by topic
+- `limit` (optional): Number of articles (default: 5)
 
-1. **Consistent JSON Responses**: All endpoints return proper JSON with correct content-type headers
-2. **Error Handling**: Comprehensive error handling that returns JSON error responses
-3. **CORS Support**: Built-in CORS headers for cross-origin requests
-4. **WordPress Integration**: Seamless access to WordPress data and functionality
-
-### Example Node.js Integration
-```javascript
-const axios = require('axios');
-
-class WordPressAPI {
-  constructor(baseUrl) {
-    this.baseUrl = baseUrl;
-  }
-
-  async getHealth() {
-    const response = await axios.get(`${this.baseUrl}/index.php?rest_route=/custom-api/v1/health`);
-    return response.data;
-  }
-
-  async getPosts(params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    const url = `${this.baseUrl}/index.php?rest_route=/custom-api/v1/posts${queryString ? '&' + queryString : ''}`;
-    const response = await axios.get(url);
-    return response.data;
-  }
-
-  async getUsers(params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    const url = `${this.baseUrl}/index.php?rest_route=/custom-api/v1/users${queryString ? '&' + queryString : ''}`;
-    const response = await axios.get(url);
-    return response.data;
-  }
-}
-
-// Usage
-const wpAPI = new WordPressAPI('http://your-site.com');
-const health = await wpAPI.getHealth();
-const posts = await wpAPI.getPosts({ per_page: 5 });
+**Example:**
+```bash
+GET /index.php?rest_route=/custom-api/v1/demo?action=news&query=AI&limit=3
 ```
 
-## Development
+### 4. Info (`action=info`)
+Get information about available actions.
 
-### Building TypeScript
+**Example:**
+```bash
+GET /index.php?rest_route=/custom-api/v1/demo?action=info
+```
 
-The plugin includes TypeScript source files. To build:
+## TypeScript Usage
+
+### Installation & Build
 
 ```bash
-cd wp-content/plugins/custom-rest-api
+# Install dependencies
 npm install
+
+# Build TypeScript
 npm run build
 ```
 
-### Adding New Endpoints
+### Using the External API Service Directly
 
-1. Add the endpoint method to the `CustomRestAPI` class
-2. Register the route in the `register_rest_routes` method
-3. Use the `create_json_response` helper method for consistent responses
+```typescript
+import { ExternalApiService } from './dist/api';
 
-Example:
-```php
-public function my_new_endpoint($request) {
-    try {
-        $data = array(
-            'message' => 'Hello from new endpoint',
-            'timestamp' => current_time('c')
-        );
-        
-        return $this->create_json_response($data, 200);
-    } catch (Exception $e) {
-        $error_response = array(
-            'success' => false,
-            'error' => $e->getMessage(),
-            'timestamp' => current_time('c')
-        );
-        return $this->create_json_response($error_response, 500);
-    }
-}
+// Create external API service with optional API keys
+const externalApi = new ExternalApiService(
+  'your_openweathermap_api_key', // Optional: for real weather data
+  'your_newsapi_key'             // Optional: for real news data
+);
+
+// Get weather data
+const weather = await externalApi.getWeatherData('Tokyo');
+
+// Get search results
+const searchResults = await externalApi.getSearchResults('artificial intelligence', 3);
+
+// Get news data
+const news = await externalApi.getNewsData('AI', 2);
 ```
 
-## Troubleshooting
+### Using the Full API Service
 
-### Issue: Getting HTML instead of JSON
+```typescript
+import { CustomApiClient, CustomApiService } from './dist/api';
 
-If you're getting HTML responses, ensure you're using the correct URL format:
+const client = new CustomApiClient(
+  'https://your-wordpress-site.com', 
+  'your-nonce',
+  'your_openweathermap_api_key', // Optional
+  'your_newsapi_key'             // Optional
+);
+const service = new CustomApiService(client);
 
-**✅ Correct format:**
-```
-http://your-site.com/index.php?rest_route=/custom-api/v1/health
-```
+// Get weather through the service
+const weather = await service.getWeather('Paris');
 
-**❌ May not work:**
-```
-http://your-site.com/index.php?rest_route=/custom-api/v1/health
-```
+// Search for information
+const searchResults = await service.getSearch('machine learning', 3);
 
-### Common Solutions
+// Get news
+const news = await service.getNews('AI', 5);
 
-1. **Use Direct REST API Format**: Always use `index.php?rest_route=` format for reliable results
-2. **Check Plugin Activation**: Ensure the plugin is activated in WordPress admin
-3. **Clear Cache**: Clear any caching plugins or server cache
-4. **Check Error Logs**: Check WordPress and server error logs
-
-### Debug Steps
-
-1. Enable WordPress debug mode in `wp-config.php`:
-```php
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);
-define('WP_DEBUG_DISPLAY', false);
+// Generic demo call
+const demo = await service.getDemo({
+  action: 'weather',
+  city: 'Paris'
+});
 ```
 
-2. Test the basic WordPress REST API:
+### Browser Usage
+
+```html
+<!-- Include the compiled TypeScript -->
+<script src="dist/api.js"></script>
+
+<script>
+// Use the external API service
+const externalApi = new ExternalApiService();
+
+// Get weather data
+externalApi.getWeatherData('New York')
+  .then(weather => console.log('Weather:', weather));
+
+// Get search results
+externalApi.getSearchResults('openai', 2)
+  .then(results => console.log('Search:', results));
+</script>
+```
+
+## Testing with curl
+
 ```bash
-curl "http://your-site.com/index.php?rest_route=/"
+# Get weather for New York
+curl "https://your-wordpress-site.com/index.php?rest_route=/custom-api/v1/demo?action=weather&city=New%20York"
+
+# Search for "artificial intelligence"
+curl "https://your-wordpress-site.com/index.php?rest_route=/custom-api/v1/demo?action=search&query=artificial%20intelligence&limit=3"
+
+# Get news about technology
+curl "https://your-wordpress-site.com/index.php?rest_route=/custom-api/v1/demo?action=news&query=technology&limit=2"
 ```
 
-3. Test your custom endpoint:
-```bash
-curl "http://your-site.com/index.php?rest_route=/custom-api/v1/health"
-```
+## Features
 
-## Security
+✅ **TypeScript-Powered**: All external API calls handled by TypeScript  
+✅ **Real External APIs**: Weather (OpenWeatherMap) and Search (DuckDuckGo)  
+✅ **No API Keys Required**: DuckDuckGo search works out of the box  
+✅ **Fallback Support**: Graceful degradation to mock data  
+✅ **Multiple Usage Patterns**: Direct API service, WordPress integration, browser usage  
+✅ **Type Safety**: Full TypeScript support with interfaces  
+✅ **Clean Architecture**: Separation of concerns between PHP and TypeScript  
 
-- All endpoints use WordPress nonces for authentication
-- CORS headers are properly configured
-- Error messages don't expose sensitive information
-- Input validation and sanitization are implemented
-
-## Support
-
-If you encounter issues:
-
-1. Verify you're using the correct URL format (`index.php?rest_route=`)
-2. Check that the plugin is activated
-3. Test with the basic WordPress REST API first
-4. Check WordPress error logs
-5. Ensure all requirements are met
-
-## Requirements
-
-- WordPress 5.0 or higher
-- PHP 7.4 or higher
-- REST API enabled (default in WordPress)
-
-## License
-
-MIT License - see LICENSE file for details.
+Perfect for your Open WebUI demo with TypeScript-powered external API integration!

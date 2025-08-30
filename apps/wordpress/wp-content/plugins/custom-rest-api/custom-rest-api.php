@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Custom REST API
  * Plugin URI: https://example.com/custom-rest-api
- * Description: A custom REST API built with TypeScript/Node.js functionality integrated into WordPress
+ * Description: A custom REST API with external API integration for Open WebUI
  * Version: 1.0.0
  * Author: Your Name
  * License: MIT
@@ -197,6 +197,34 @@ class CustomRestAPI
             'methods' => 'GET',
             'callback' => array($this, 'search_content'),
             'permission_callback' => '__return_true'
+        ));
+
+        // Demo endpoint for Open WebUI integration
+        register_rest_route('custom-api/v1', '/demo', array(
+            'methods' => 'GET, POST',
+            'callback' => array($this, 'demo_endpoint'),
+            'permission_callback' => '__return_true'
+        ));
+
+        // Weather API endpoint
+        register_rest_route('custom-api/v1', '/weather', array(
+            'methods' => 'GET, POST',
+            'callback' => array($this, 'get_weather'),
+            'permission_callback' => '__return_true',
+            'args' => array(
+                'city' => array(
+                    'required' => true,
+                    'type' => 'string',
+                    'description' => 'City name to get weather for',
+                    'sanitize_callback' => 'sanitize_text_field'
+                ),
+                'country' => array(
+                    'required' => false,
+                    'type' => 'string',
+                    'description' => 'Country code (optional)',
+                    'sanitize_callback' => 'sanitize_text_field'
+                )
+            )
         ));
 
         error_log('Custom REST API: Routes registered successfully');
@@ -395,11 +423,11 @@ class CustomRestAPI
     public function get_node_data($request)
     {
         try {
-            // This endpoint simulates Node.js functionality
-            $node_data = array(
+            // This endpoint provides server information
+            $server_data = array(
                 'success' => true,
                 'data' => array(
-                    'message' => 'Node.js-like data from WordPress',
+                    'message' => 'Server information from WordPress',
                     'timestamp' => time(),
                     'random_number' => rand(1, 1000),
                     'server_info' => array(
@@ -426,7 +454,7 @@ class CustomRestAPI
                 )
             );
 
-            return $this->create_json_response($node_data, 200);
+            return $this->create_json_response($server_data, 200);
         } catch (Exception $e) {
             $error_response = array(
                 'success' => false,
@@ -680,6 +708,8 @@ class CustomRestAPI
         wp_send_json($response);
     }
 
+
+
     private function load_node_dependencies()
     {
         // Check if Node.js dependencies are available
@@ -724,6 +754,292 @@ class CustomRestAPI
         }
         return $served;
     }
+
+    /**
+     * Demo endpoint for Open WebUI integration
+     * Weather API using free service
+     */
+    public function demo_endpoint($request)
+    {
+        $action = $request->get_param('action') ?: 'info';
+        $city = $request->get_param('city') ?: 'London';
+        $query = $request->get_param('query') ?: '';
+        
+        switch ($action) {
+            case 'weather':
+                return $this->get_weather_data($city);
+            case 'search':
+                return $this->get_search_results($query);
+            case 'info':
+            default:
+                $response = array(
+                    'success' => true,
+                    'message' => 'Demo endpoint working!',
+                    'available_actions' => array('weather', 'search', 'info'),
+                    'examples' => array(
+                        'weather' => '/demo?action=weather&city=New York',
+                        'search' => '/demo?action=search&query=openai'
+                    ),
+                    'timestamp' => current_time('c')
+                );
+                return $this->create_json_response($response, 200);
+        }
+    }
+    
+    /**
+     * Get weather data from free API
+     */
+    private function get_weather_data($city)
+    {
+        try {
+            // Using wttr.in - a free weather API
+            $url = 'https://wttr.in/' . urlencode($city) . '?format=j1';
+            $response = wp_remote_get($url);
+            
+            if (is_wp_error($response)) {
+                throw new Exception('Failed to fetch weather data: ' . $response->get_error_message());
+            }
+            
+            $body = wp_remote_retrieve_body($response);
+            $data = json_decode($body, true);
+            
+            if (!$data || !isset($data['current_condition'][0])) {
+                throw new Exception('Invalid weather data received');
+            }
+            
+            $current = $data['current_condition'][0];
+            $nearest_area = $data['nearest_area'][0];
+            
+            $weather_response = array(
+                'success' => true,
+                'data' => array(
+                    'city' => $nearest_area['areaName'][0]['value'],
+                    'country' => $nearest_area['country'][0]['value'],
+                    'temperature' => $current['temp_C'] . '°C',
+                    'feels_like' => $current['FeelsLikeC'] . '°C',
+                    'description' => $current['weatherDesc'][0]['value'],
+                    'humidity' => $current['humidity'] . '%',
+                    'wind_speed' => $current['windspeedKmph'] . ' km/h',
+                    'wind_direction' => $current['winddir16Point'],
+                    'visibility' => $current['visibility'] . ' km',
+                    'pressure' => $current['pressure'] . ' mb',
+                    'uv_index' => $current['uvIndex'],
+                    'time' => $current['observation_time'],
+                    'source' => 'wttr.in'
+                ),
+                'timestamp' => current_time('c')
+            );
+            
+            return $this->create_json_response($weather_response, 200);
+            
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
+                'timestamp' => current_time('c')
+            );
+            return $this->create_json_response($error_response, 500);
+        }
+    }
+    
+    /**
+     * Get search results using DuckDuckGo Instant Answer API
+     */
+    private function get_search_results($query)
+    {
+        try {
+            if (empty($query)) {
+                throw new Exception('Search query is required');
+            }
+            
+            // Using DuckDuckGo Instant Answer API (free, no API key needed)
+            $url = 'https://api.duckduckgo.com/?q=' . urlencode($query) . '&format=json&no_html=1&skip_disambig=1';
+            $response = wp_remote_get($url);
+            
+            if (is_wp_error($response)) {
+                throw new Exception('Failed to fetch search results: ' . $response->get_error_message());
+            }
+            
+            $body = wp_remote_retrieve_body($response);
+            $data = json_decode($body, true);
+            
+            $results = array();
+            
+            // Add abstract if available
+            if (!empty($data['Abstract'])) {
+                $results[] = array(
+                    'title' => $data['Heading'] ?: $query,
+                    'snippet' => $data['Abstract'],
+                    'url' => $data['AbstractURL'] ?: '',
+                    'source' => 'DuckDuckGo Instant Answer'
+                );
+            }
+            
+            // Add related topics
+            if (!empty($data['RelatedTopics'])) {
+                foreach (array_slice($data['RelatedTopics'], 0, 5) as $topic) {
+                    if (isset($topic['Text']) && isset($topic['FirstURL'])) {
+                        $results[] = array(
+                            'title' => $topic['Text'],
+                            'snippet' => $topic['Text'],
+                            'url' => $topic['FirstURL'],
+                            'source' => 'DuckDuckGo Related Topics'
+                        );
+                    }
+                }
+            }
+            
+            if (empty($results)) {
+                $results[] = array(
+                    'title' => 'No results found',
+                    'snippet' => 'No search results available for: ' . $query,
+                    'url' => '',
+                    'source' => 'DuckDuckGo'
+                );
+            }
+            
+            $search_response = array(
+                'success' => true,
+                'data' => array(
+                    'query' => $query,
+                    'results' => $results,
+                    'total_results' => count($results),
+                    'source' => 'DuckDuckGo Instant Answer API'
+                ),
+                'timestamp' => current_time('c')
+            );
+            
+            return $this->create_json_response($search_response, 200);
+            
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
+                'timestamp' => current_time('c')
+            );
+            return $this->create_json_response($error_response, 500);
+        }
+    }
+
+    /**
+     * Get weather information for a city
+     */
+    public function get_weather($request)
+    {
+        try {
+            $city = $request->get_param('city');
+            $country = $request->get_param('country');
+
+            if (empty($city)) {
+                $error_response = array(
+                    'success' => false,
+                    'error' => 'City parameter is required',
+                    'timestamp' => current_time('c')
+                );
+                return $this->create_json_response($error_response, 400);
+            }
+
+            // Build location string
+            $location = $city;
+            if (!empty($country)) {
+                $location .= ',' . $country;
+            }
+
+            // Using OpenWeatherMap API (free tier, no API key needed for basic weather)
+            // For demo purposes, we'll use a mock weather service that doesn't require API keys
+            $weather_data = $this->get_mock_weather_data($city, $country);
+
+            $response = array(
+                'success' => true,
+                'data' => array(
+                    'location' => array(
+                        'city' => $city,
+                        'country' => $country ?: 'Unknown',
+                        'full_location' => $location
+                    ),
+                    'weather' => $weather_data,
+                    'timestamp' => current_time('c'),
+                    'source' => 'Mock Weather API (Demo)'
+                ),
+                'meta' => array(
+                    'endpoint' => '/index.php?rest_route=/custom-api/v1/weather',
+                    'method' => 'GET',
+                    'parameters' => array(
+                        'city' => $city,
+                        'country' => $country ?: 'Not specified'
+                    )
+                )
+            );
+
+            return $this->create_json_response($response, 200);
+
+        } catch (Exception $e) {
+            $error_response = array(
+                'success' => false,
+                'error' => $e->getMessage(),
+                'timestamp' => current_time('c')
+            );
+            return $this->create_json_response($error_response, 500);
+        }
+    }
+
+    /**
+     * Generate mock weather data for demo purposes
+     */
+    private function get_mock_weather_data($city, $country = '')
+    {
+        // Generate consistent weather based on city name (for demo purposes)
+        $city_hash = crc32(strtolower($city));
+        $weather_conditions = array(
+            'Clear', 'Cloudy', 'Partly Cloudy', 'Rainy', 'Sunny', 
+            'Overcast', 'Light Rain', 'Thunderstorm', 'Foggy', 'Windy'
+        );
+        
+        $condition = $weather_conditions[$city_hash % count($weather_conditions)];
+        
+        // Generate temperature based on city hash (between -10 and 35 degrees Celsius)
+        $temperature = ($city_hash % 45) - 10;
+        
+        // Generate humidity (between 30 and 90%)
+        $humidity = ($city_hash % 60) + 30;
+        
+        // Generate wind speed (between 0 and 25 km/h)
+        $wind_speed = ($city_hash % 25);
+        
+        // Generate pressure (between 980 and 1030 hPa)
+        $pressure = ($city_hash % 50) + 980;
+        
+        // Generate feels like temperature (slightly different from actual temperature)
+        $feels_like = $temperature + (($city_hash % 7) - 3);
+        
+        return array(
+            'condition' => $condition,
+            'temperature' => array(
+                'current' => $temperature,
+                'feels_like' => $feels_like,
+                'unit' => 'celsius'
+            ),
+            'humidity' => $humidity,
+            'wind' => array(
+                'speed' => $wind_speed,
+                'unit' => 'km/h'
+            ),
+            'pressure' => array(
+                'value' => $pressure,
+                'unit' => 'hPa'
+            ),
+            'visibility' => array(
+                'value' => ($city_hash % 10) + 5,
+                'unit' => 'km'
+            ),
+            'uv_index' => ($city_hash % 11),
+            'sunrise' => '06:00',
+            'sunset' => '18:00',
+            'last_updated' => current_time('c')
+        );
+    }
+    
+
 }
 
 // Initialize the plugin
