@@ -945,9 +945,8 @@ class CustomRestAPI
                 $location .= ',' . $country;
             }
 
-            // Using OpenWeatherMap API (free tier, no API key needed for basic weather)
-            // For demo purposes, we'll use a mock weather service that doesn't require API keys
-            $weather_data = $this->get_mock_weather_data($city, $country);
+            // Try to get real weather data from OpenWeatherMap API
+            $weather_data = $this->get_real_weather_data($city, $country);
 
             $response = array(
                 'success' => true,
@@ -959,7 +958,7 @@ class CustomRestAPI
                     ),
                     'weather' => $weather_data,
                     'timestamp' => current_time('c'),
-                    'source' => 'Mock Weather API (Demo)'
+                    'source' => $weather_data['source']
                 ),
                 'meta' => array(
                     'endpoint' => '/index.php?rest_route=/custom-api/v1/weather',
@@ -984,7 +983,76 @@ class CustomRestAPI
     }
 
     /**
-     * Generate mock weather data for demo purposes
+     * Get real weather data from OpenWeatherMap API (like src/api.ts)
+     */
+    private function get_real_weather_data($city, $country = '')
+    {
+        try {
+            // Build location string
+            $location = $city;
+            if (!empty($country)) {
+                $location .= ',' . $country;
+            }
+
+            // Get API key from WordPress options or use demo key
+            $api_key = get_option('openweathermap_api_key', 'demo_key');
+            
+            // OpenWeatherMap API URL (same as src/api.ts)
+            $url = "http://api.openweathermap.org/data/2.5/weather?q=" . urlencode($location) . "&appid=" . $api_key . "&units=metric";
+            
+            $response = wp_remote_get($url);
+            
+            if (is_wp_error($response)) {
+                throw new Exception('Failed to fetch weather data: ' . $response->get_error_message());
+            }
+            
+            $body = wp_remote_retrieve_body($response);
+            $data = json_decode($body, true);
+            
+            // Check if we got valid data
+            if ($data && isset($data['main']) && isset($data['weather'][0])) {
+                return array(
+                    'condition' => ucfirst($data['weather'][0]['description']),
+                    'temperature' => array(
+                        'current' => round($data['main']['temp']),
+                        'feels_like' => round($data['main']['feels_like']),
+                        'unit' => 'celsius'
+                    ),
+                    'humidity' => $data['main']['humidity'],
+                    'wind' => array(
+                        'speed' => round($data['wind']['speed'] * 3.6), // Convert m/s to km/h
+                        'unit' => 'km/h'
+                    ),
+                    'pressure' => array(
+                        'value' => $data['main']['pressure'],
+                        'unit' => 'hPa'
+                    ),
+                    'visibility' => array(
+                        'value' => round($data['visibility'] / 1000), // Convert meters to km
+                        'unit' => 'km'
+                    ),
+                    'uv_index' => isset($data['uvi']) ? $data['uvi'] : 0,
+                    'sunrise' => date('H:i', $data['sys']['sunrise']),
+                    'sunset' => date('H:i', $data['sys']['sunset']),
+                    'last_updated' => current_time('c'),
+                    'source' => 'openweathermap_api'
+                );
+            }
+            
+            throw new Exception('Invalid weather data received from API');
+            
+        } catch (Exception $e) {
+            // Fallback to mock data if API fails (same as src/api.ts)
+            error_log('Weather API failed: ' . $e->getMessage() . ' - Using mock data');
+            $mock_data = $this->get_mock_weather_data($city, $country);
+            $mock_data['source'] = 'mock_data';
+            $mock_data['note'] = 'Using mock data - add real API key for live weather';
+            return $mock_data;
+        }
+    }
+
+    /**
+     * Generate mock weather data for demo purposes (fallback)
      */
     private function get_mock_weather_data($city, $country = '')
     {
