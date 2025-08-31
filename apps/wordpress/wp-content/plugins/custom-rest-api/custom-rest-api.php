@@ -393,30 +393,31 @@ class CustomRestAPI
         // Execute the Node.js script with environment variable
         $env_var = "OPEN_WEATHER_MAP_KEY=" . escapeshellarg($weather_api_key);
         $output = shell_exec($env_var . " node " . escapeshellarg($temp_file) . " 2>&1");
-        $return_code = $this->get_last_return_code();
 
         // Clean up temp file
         unlink($temp_file);
 
-        if ($return_code !== 0) {
-            throw new Exception('TypeScript service failed: ' . $output . 'debug api key:' . $weather_api_key);
+        // Check if output contains error JSON
+        if (strpos($output, '{"error":') !== false) {
+            $error_data = json_decode($output, true);
+            throw new Exception('TypeScript service failed: ' . ($error_data['error'] ?? 'Unknown error'));
         }
 
+        // Check if output is valid JSON
         $data = json_decode($output, true);
-        if (!$data || isset($data['error'])) {
-            throw new Exception('Invalid response from TypeScript service: ' . ($data['error'] ?? 'Unknown error'));
+        if (!$data) {
+            throw new Exception('Invalid JSON response from TypeScript service: ' . $output);
+        }
+
+        // Check if the data contains an error
+        if (isset($data['error'])) {
+            throw new Exception('TypeScript service error: ' . $data['error']);
         }
 
         return $data;
     }
 
-    /**
-     * Get the return code of the last shell command
-     */
-    private function get_last_return_code()
-    {
-        return function_exists('shell_exec') ? shell_exec('echo $?') : 0;
-    }
+
 }
 
 // Initialize the plugin
