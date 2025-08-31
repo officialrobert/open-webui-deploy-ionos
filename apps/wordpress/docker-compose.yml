@@ -54,6 +54,10 @@ services:
       WP_PROXY_USERNAME: ""
       WP_PROXY_PASSWORD: ""
       WP_PROXY_BYPASS_HOSTS: "localhost,127.0.0.1"
+      # API Configuration
+      OPEN_WEATHER_MAP_KEY: ""
+      NEWSAPI_KEY: ""
+      DUCKDUCKGO_ENABLED: "true"
     depends_on:
       db:
         condition: service_healthy
@@ -91,6 +95,10 @@ services:
       WP_PROXY_USERNAME: ""
       WP_PROXY_PASSWORD: ""
       WP_PROXY_BYPASS_HOSTS: "localhost,127.0.0.1"
+      # API Configuration
+      OPEN_WEATHER_MAP_KEY: ""
+      NEWSAPI_KEY: ""
+      DUCKDUCKGO_ENABLED: "true"
     depends_on:
       db:
         condition: service_healthy
@@ -128,6 +136,10 @@ services:
       WP_PROXY_USERNAME: ""
       WP_PROXY_PASSWORD: ""
       WP_PROXY_BYPASS_HOSTS: "localhost,127.0.0.1"
+      # API Configuration
+      OPEN_WEATHER_MAP_KEY: ""
+      NEWSAPI_KEY: ""
+      DUCKDUCKGO_ENABLED: "true"
     depends_on:
       db:
         condition: service_healthy

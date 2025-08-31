@@ -1,8 +1,52 @@
 #!/usr/bin/env node
 
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+// Load environment variables from .env files
+function loadEnvFiles() {
+  const envFiles = [
+    '.env',
+    '.env.local',
+    '.env.production',
+    '.env.development',
+  ];
+
+  let filesLoaded = 0;
+
+  for (const envFile of envFiles) {
+    const envPath = path.join(__dirname, envFile);
+    if (fs.existsSync(envPath)) {
+      try {
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const lines = envContent.split('\n');
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (trimmedLine && !trimmedLine.startsWith('#')) {
+            const [key, ...valueParts] = trimmedLine.split('=');
+            if (key && valueParts.length > 0) {
+              const value = valueParts.join('=').replace(/^["']|["']$/g, '');
+              process.env[key] = value;
+            }
+          }
+        }
+        console.log(`Environment variables loaded from ${envFile}`);
+        filesLoaded++;
+      } catch (error) {
+        console.log(`Warning: Could not read ${envFile}: ${error.message}`);
+      }
+    }
+  }
+
+  if (filesLoaded === 0) {
+    console.log('No environment files found, using system defaults');
+  }
+}
+
+// Load environment variables at startup
+loadEnvFiles();
 
 // Colors for console output
 const colors = {
@@ -18,6 +62,22 @@ const colors = {
 
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
+}
+
+// Log important environment variables for debugging
+if (process.env.OPEN_WEATHER_MAP_KEY) {
+  const maskedKey =
+    process.env.OPEN_WEATHER_MAP_KEY.substring(0, 4) +
+    '*'.repeat(Math.max(0, process.env.OPEN_WEATHER_MAP_KEY.length - 8)) +
+    process.env.OPEN_WEATHER_MAP_KEY.substring(
+      process.env.OPEN_WEATHER_MAP_KEY.length - 4,
+    );
+  log(`🌤️  OpenWeatherMap API Key loaded: ${maskedKey}`, 'green');
+} else {
+  log(
+    '⚠️  OpenWeatherMap API Key not found in environment variables',
+    'yellow',
+  );
 }
 
 function execCommand(command, options = {}) {
@@ -193,10 +253,17 @@ define( 'WP_PROXY_HOST', '${process.env.WP_PROXY_HOST || ''}' );
 define( 'WP_PROXY_PORT', '${process.env.WP_PROXY_PORT || ''}' );
 define( 'WP_PROXY_USERNAME', '${process.env.WP_PROXY_USERNAME || ''}' );
 define( 'WP_PROXY_PASSWORD', '${process.env.WP_PROXY_PASSWORD || ''}' );
-define( 'WP_PROXY_BYPASS_HOSTS', '${process.env.WP_PROXY_BYPASS_HOSTS || 'localhost,127.0.0.1'}' );
+define( 'WP_PROXY_BYPASS_HOSTS', '${
+      process.env.WP_PROXY_BYPASS_HOSTS || 'localhost,127.0.0.1'
+    }' );
 
 // Trust all proxy headers (use with caution in production)
 define( 'WP_HTTP_BLOCK_EXTERNAL', false );
+
+// API Configuration
+define( 'OPEN_WEATHER_MAP_KEY', '${process.env.OPEN_WEATHER_MAP_KEY || ''}' );
+define( 'NEWSAPI_KEY', '${process.env.NEWSAPI_KEY || ''}' );
+define( 'DUCKDUCKGO_ENABLED', '${process.env.DUCKDUCKGO_ENABLED || 'true'}' );
 
 /* That's all, stop editing! Happy publishing. */
 

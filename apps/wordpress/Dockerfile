@@ -77,6 +77,23 @@ RUN cp -r /tmp/wordpress/* /var/www/html/ \
 COPY start-wordpress.js /usr/local/bin/
 COPY wp-config-sample.php /var/www/html/
 
+# Copy environment files (if they exist) - using shell to handle missing files gracefully
+RUN touch /tmp/.env.default && \
+    if ls .env* 1> /dev/null 2>&1; then \
+        cp .env* /tmp/; \
+        echo "Environment files copied"; \
+    else \
+        echo "No .env files found, using defaults"; \
+    fi
+
+# Load environment variables from .env files if they exist
+RUN for envfile in /tmp/.env*; do \
+        if [ -f "$envfile" ] && [ "$envfile" != "/tmp/.env.default" ]; then \
+            echo "Loading environment variables from $(basename $envfile)"; \
+            export $(cat "$envfile" | grep -v '^#' | xargs); \
+        fi; \
+    done
+
 # Copy custom REST API plugin
 COPY wp-content/plugins/custom-rest-api /var/www/html/wp-content/plugins/custom-rest-api/
 
@@ -95,6 +112,12 @@ RUN mkdir -p /var/www/html/wp-content/uploads \
     && mkdir -p /var/www/html/wp-content/cache \
     && chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html
+
+# Load environment variables from .env files if they exist
+RUN if [ -f /tmp/.env ]; then \
+        export $(cat /tmp/.env | grep -v '^#' | xargs); \
+        echo "Environment variables loaded from .env"; \
+    fi
 
 # Configure Apache for port 3000
 RUN sed -i "s/Listen 80/Listen 0.0.0.0:3000/" /etc/apache2/ports.conf \
