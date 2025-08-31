@@ -265,6 +265,11 @@ define( 'OPEN_WEATHER_MAP_KEY', '${process.env.OPEN_WEATHER_MAP_KEY || ''}' );
 define( 'NEWSAPI_KEY', '${process.env.NEWSAPI_KEY || ''}' );
 define( 'DUCKDUCKGO_ENABLED', '${process.env.DUCKDUCKGO_ENABLED || 'true'}' );
 
+// Load environment variables from env.php if it exists
+if (file_exists(__DIR__ . '/env.php')) {
+    require_once __DIR__ . '/env.php';
+}
+
 /* That's all, stop editing! Happy publishing. */
 
 /** Absolute path to the WordPress directory. */

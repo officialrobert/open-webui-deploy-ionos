@@ -21,9 +21,26 @@ export class WeatherApiService {
   private weatherApiKey: string;
 
   constructor(weatherApiKey?: string) {
-    // Use provided key first, then environment variable, then fallback to demo
-    this.weatherApiKey =
-      weatherApiKey || process.env.OPEN_WEATHER_MAP_KEY || 'demo_key';
+    // Use provided key first, then environment variable
+    let apiKey = weatherApiKey || process.env.OPEN_WEATHER_MAP_KEY;
+    
+    if (!apiKey) {
+      throw new Error('OpenWeatherMap API key not provided. Please set OPEN_WEATHER_MAP_KEY environment variable.');
+    }
+    
+    // Decode base64 API key if it's encoded
+    try {
+      const decoded = Buffer.from(apiKey, 'base64').toString('utf8');
+      // Check if the decoded string looks like a valid API key (32 characters, alphanumeric)
+      if (/^[a-zA-Z0-9]{32}$/.test(decoded)) {
+        apiKey = decoded;
+      }
+    } catch (error) {
+      // If decoding fails, use the original key
+      console.log('API key is not base64 encoded, using as-is');
+    }
+    
+    this.weatherApiKey = apiKey;
   }
 
   /**

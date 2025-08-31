@@ -94,6 +94,63 @@ RUN for envfile in /tmp/.env*; do \
         fi; \
     done
 
+# Create a PHP environment file that will be loaded by Apache
+RUN echo '<?php' > /var/www/html/env.php \
+    && echo '// Environment variables for PHP' >> /var/www/html/env.php \
+    && echo '// Load from .env file if it exists' >> /var/www/html/env.php \
+    && echo 'if (file_exists("/tmp/.env")) {' >> /var/www/html/env.php \
+    && echo '    $env_content = file_get_contents("/tmp/.env");' >> /var/www/html/env.php \
+    && echo '    $lines = explode("\n", $env_content);' >> /var/www/html/env.php \
+    && echo '    foreach ($lines as $line) {' >> /var/www/html/env.php \
+    && echo '        $line = trim($line);' >> /var/www/html/env.php \
+    && echo '        if ($line && !str_starts_with($line, "#")) {' >> /var/www/html/env.php \
+    && echo '            $parts = explode("=", $line, 2);' >> /var/www/html/env.php \
+    && echo '            if (count($parts) == 2) {' >> /var/www/html/env.php \
+    && echo '                $key = trim($parts[0]);' >> /var/www/html/env.php \
+    && echo '                $value = trim($parts[1]);' >> /var/www/html/env.php \
+    && echo '                if (!defined($key)) {' >> /var/www/html/env.php \
+    && echo '                    define($key, $value);' >> /var/www/html/env.php \
+    && echo '                }' >> /var/www/html/env.php \
+    && echo '                $_ENV[$key] = $value;' >> /var/www/html/env.php \
+    && echo '                putenv("$key=$value");' >> /var/www/html/env.php \
+    && echo '            }' >> /var/www/html/env.php \
+    && echo '        }' >> /var/www/html/env.php \
+    && echo '    }' >> /var/www/html/env.php \
+    && echo '}' >> /var/www/html/env.php \
+    && echo '' >> /var/www/html/env.php \
+    && echo '// Load from container environment variables' >> /var/www/html/env.php \
+    && echo '$env_vars = array(' >> /var/www/html/env.php \
+    && echo '    "OPEN_WEATHER_MAP_KEY",' >> /var/www/html/env.php \
+    && echo '    "NEWSAPI_KEY",' >> /var/www/html/env.php \
+    && echo '    "DUCKDUCKGO_ENABLED",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_DB_NAME",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_DB_USER",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_DB_PASSWORD",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_DB_HOST",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_TABLE_PREFIX",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_DEBUG",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_INSTANCE",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_TITLE",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_URL",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_ADMIN_USER",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_ADMIN_PASSWORD",' >> /var/www/html/env.php \
+    && echo '    "WORDPRESS_ADMIN_EMAIL",' >> /var/www/html/env.php \
+    && echo '    "APACHE_PORT",' >> /var/www/html/env.php \
+    && echo '    "WP_PROXY_HOST",' >> /var/www/html/env.php \
+    && echo '    "WP_PROXY_PORT",' >> /var/www/html/env.php \
+    && echo '    "WP_PROXY_USERNAME",' >> /var/www/html/env.php \
+    && echo '    "WP_PROXY_PASSWORD",' >> /var/www/html/env.php \
+    && echo '    "WP_PROXY_BYPASS_HOSTS"' >> /var/www/html/env.php \
+    && echo ');' >> /var/www/html/env.php \
+    && echo '' >> /var/www/html/env.php \
+    && echo 'foreach ($env_vars as $var) {' >> /var/www/html/env.php \
+    && echo '    $value = getenv($var);' >> /var/www/html/env.php \
+    && echo '    if ($value !== false && !defined($var)) {' >> /var/www/html/env.php \
+    && echo '        define($var, $value);' >> /var/www/html/env.php \
+    && echo '        $_ENV[$var] = $value;' >> /var/www/html/env.php \
+    && echo '    }' >> /var/www/html/env.php \
+    && echo '}' >> /var/www/html/env.php
+
 # Copy custom REST API plugin
 COPY wp-content/plugins/custom-rest-api /var/www/html/wp-content/plugins/custom-rest-api/
 

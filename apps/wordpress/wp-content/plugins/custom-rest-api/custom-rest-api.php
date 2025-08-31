@@ -343,9 +343,7 @@ class CustomRestAPI
      */
     private function call_typescript_weather_service($city)
     {
-        // Get the OpenWeatherMap API key from environment variable
-        $weather_api_key = 'd351242baef7265e672e3e68d2786d52';
-        
+
         // Try multiple ways to get the API key
         if (defined('OPEN_WEATHER_MAP_KEY') && !empty(constant('OPEN_WEATHER_MAP_KEY'))) {
             $weather_api_key = constant('OPEN_WEATHER_MAP_KEY');
@@ -354,12 +352,22 @@ class CustomRestAPI
         } elseif (isset($_ENV['OPEN_WEATHER_MAP_KEY'])) {
             $weather_api_key = $_ENV['OPEN_WEATHER_MAP_KEY'];
         }
-        
+
+        if (!$weather_api_key) {
+            throw new Exception('OpenWeatherMap API key not found in environment variables. Please set OPEN_WEATHER_MAP_KEY in your environment or .env file.');
+        }
+
+        // Decode base64 API key if it's encoded
+        if (base64_encode(base64_decode($weather_api_key, true)) === $weather_api_key) {
+            $weather_api_key = base64_decode($weather_api_key);
+        }
+
         // Debug: log what we found
-        error_log('Weather API Key Debug - defined: ' . (defined('OPEN_WEATHER_MAP_KEY') ? 'yes' : 'no') . 
-                 ', getenv: ' . (getenv('OPEN_WEATHER_MAP_KEY') ? 'yes' : 'no') . 
-                 ', _ENV: ' . (isset($_ENV['OPEN_WEATHER_MAP_KEY']) ? 'yes' : 'no') . 
-                 ', final key: ' . substr($weather_api_key, 0, 4) . '***');
+        error_log('Weather API Key Debug - defined: ' . (defined('OPEN_WEATHER_MAP_KEY') ? 'yes' : 'no') .
+            ', getenv: ' . (getenv('OPEN_WEATHER_MAP_KEY') ? 'yes' : 'no') .
+            ', _ENV: ' . (isset($_ENV['OPEN_WEATHER_MAP_KEY']) ? 'yes' : 'no') .
+            ', final key: ' . substr($weather_api_key, 0, 4) . '***' .
+            ', defined value: ' . (defined('OPEN_WEATHER_MAP_KEY') ? constant('OPEN_WEATHER_MAP_KEY') : 'not defined'));
 
         // Execute Node.js script to call TypeScript service
         $script_path = CUSTOM_REST_API_PLUGIN_DIR . 'dist/api.js';
@@ -391,7 +399,7 @@ class CustomRestAPI
         unlink($temp_file);
 
         if ($return_code !== 0) {
-            throw new Exception('TypeScript service failed: ' . $output . 'debug api key' . $weather_api_key);
+            throw new Exception('TypeScript service failed: ' . $output . 'debug api key:' . $weather_api_key);
         }
 
         $data = json_decode($output, true);
