@@ -25,25 +25,104 @@ jobs:
 
     - name: Login to IONOS Container Registry
       run: |
+        set -e  # Exit on any error
+        
         # Step 1: Get access token using secure token
         echo "Getting access token..."
-        ACCESS_TOKEN_RESPONSE=$(curl -s -X POST \
+        ACCESS_TOKEN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ secrets.IONOS_SECURE_TOKEN }}" \
           -d '{"grant_type": "client_credentials"}' \
           "https://api.ionos.com/auth/v1/tokens")
         
-        ACCESS_TOKEN=$(echo $ACCESS_TOKEN_RESPONSE | jq -r '.access_token')
-        echo "Access token obtained"
+        HTTP_CODE=$(echo "$ACCESS_TOKEN_RESPONSE" | tail -n1)
+        ACCESS_TOKEN_RESPONSE=$(echo "$ACCESS_TOKEN_RESPONSE" | head -n -1)
         
-        # Step 2: Create or get container registry token
-        echo "Creating container registry token..."
-        TOKEN_RESPONSE=$(curl -s -X POST \
+        if [ "$HTTP_CODE" != "200" ]; then
+          echo "❌ Failed to get access token. HTTP Code: $HTTP_CODE"
+          echo "Response: $ACCESS_TOKEN_RESPONSE"
+          exit 1
+        fi
+        
+        ACCESS_TOKEN=$(echo $ACCESS_TOKEN_RESPONSE | jq -r '.access_token')
+        if [ "$ACCESS_TOKEN" = "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+          echo "❌ Failed to extract access token from response"
+          echo "Response: $ACCESS_TOKEN_RESPONSE"
+          exit 1
+        fi
+        
+        echo "✅ Access token obtained successfully"
+        
+        # Step 2: Check if registry already exists
+        echo "Checking if registry '${{ env.REGISTRY_NAME }}' exists..."
+        EXISTING_REGISTRY=$(curl -s -w "\n%{http_code}" -X GET \
+          -H "Authorization: Bearer $ACCESS_TOKEN" \
+          "https://api.ionos.com/containerregistries/registries?name=${{ env.REGISTRY_NAME }}")
+        
+        HTTP_CODE=$(echo "$EXISTING_REGISTRY" | tail -n1)
+        EXISTING_REGISTRY=$(echo "$EXISTING_REGISTRY" | head -n -1)
+        
+        if [ "$HTTP_CODE" = "200" ]; then
+          REGISTRY_ID=$(echo $EXISTING_REGISTRY | jq -r '.items[0].id // empty')
+          if [ -n "$REGISTRY_ID" ]; then
+            echo "✅ Found existing registry with ID: $REGISTRY_ID"
+            REGISTRY_HOSTNAME=$(echo $EXISTING_REGISTRY | jq -r '.items[0].properties.hostname')
+          else
+            echo "ℹ️ No existing registry found, will create new one"
+            REGISTRY_ID=""
+          fi
+        else
+          echo "ℹ️ Could not check existing registries, will create new one"
+          REGISTRY_ID=""
+        fi
+        
+        # Step 3: Create registry if it doesn't exist
+        if [ -z "$REGISTRY_ID" ]; then
+          echo "Creating new container registry..."
+          REGISTRY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -d '{
+              "properties": {
+                "name": "'${{ env.REGISTRY_NAME }}'",
+                "location": "'${{ env.REGISTRY_LOCATION }}'",
+                "garbageCollectionSchedule": {
+                  "days": ["Sunday"],
+                  "time": "02:00:00+00:00"
+                },
+                "features": {
+                  "vulnerabilityScanning": {
+                    "enabled": true
+                  }
+                }
+              }
+            }' \
+            "https://api.ionos.com/containerregistries/registries")
+          
+          HTTP_CODE=$(echo "$REGISTRY_RESPONSE" | tail -n1)
+          REGISTRY_RESPONSE=$(echo "$REGISTRY_RESPONSE" | head -n -1)
+          
+          if [ "$HTTP_CODE" != "202" ] && [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Failed to create registry. HTTP Code: $HTTP_CODE"
+            echo "Response: $REGISTRY_RESPONSE"
+            exit 1
+          fi
+          
+          REGISTRY_ID=$(echo $REGISTRY_RESPONSE | jq -r '.id')
+          REGISTRY_HOSTNAME=$(echo $REGISTRY_RESPONSE | jq -r '.properties.hostname')
+          echo "✅ Registry created with ID: $REGISTRY_ID"
+        fi
+        
+        echo "Registry hostname: $REGISTRY_HOSTNAME"
+        
+        # Step 4: Create registry token
+        echo "Creating registry token..."
+        TOKEN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer $ACCESS_TOKEN" \
           -d '{
             "properties": {
-              "name": "github-actions-token",
+              "name": "github-actions-token-'$(date +%s)'",
               "expiryDate": "'$(date -d '+1 year' -u +%Y-%m-%dT%H:%M:%SZ)'",
               "scopes": [
                 {
@@ -57,41 +136,38 @@ jobs:
               ]
             }
           }' \
-          "https://api.ionos.com/containerregistries/registries")
+          "https://api.ionos.com/containerregistries/registries/$REGISTRY_ID/tokens")
+        
+        HTTP_CODE=$(echo "$TOKEN_RESPONSE" | tail -n1)
+        TOKEN_RESPONSE=$(echo "$TOKEN_RESPONSE" | head -n -1)
+        
+        if [ "$HTTP_CODE" != "202" ] && [ "$HTTP_CODE" != "200" ]; then
+          echo "❌ Failed to create token. HTTP Code: $HTTP_CODE"
+          echo "Response: $TOKEN_RESPONSE"
+          exit 1
+        fi
         
         TOKEN_ID=$(echo $TOKEN_RESPONSE | jq -r '.id')
         TOKEN_SECRET=$(echo $TOKEN_RESPONSE | jq -r '.properties.credentials.password')
-        REGISTRY_HOSTNAME=$(echo $TOKEN_RESPONSE | jq -r '.properties.hostname')
         
-        echo "Token created with ID: $TOKEN_ID"
-        echo "Registry hostname: $REGISTRY_HOSTNAME"
+        if [ "$TOKEN_ID" = "null" ] || [ -z "$TOKEN_ID" ]; then
+          echo "❌ Failed to extract token ID from response"
+          echo "Response: $TOKEN_RESPONSE"
+          exit 1
+        fi
         
-        # Step 3: Create or update container registry
-        echo "Creating/updating container registry..."
-        REGISTRY_RESPONSE=$(curl -s -X POST \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer $ACCESS_TOKEN" \
-          -d '{
-            "properties": {
-              "name": "'${{ env.REGISTRY_NAME }}'",
-              "location": "'${{ env.REGISTRY_LOCATION }}'",
-              "garbageCollectionSchedule": {
-                "days": ["Sunday"],
-                "time": "02:00:00+00:00"
-              },
-              "features": {
-                "vulnerabilityScanning": {
-                  "enabled": true
-                }
-              }
-            }
-          }' \
-          "https://api.ionos.com/containerregistries/registries")
+        echo "✅ Token created with ID: $TOKEN_ID"
         
-        echo "Registry response: $REGISTRY_RESPONSE"
-        
-        # Step 4: Login to Docker registry
+        # Step 5: Login to Docker registry
+        echo "Logging into Docker registry..."
         echo "$TOKEN_SECRET" | docker login $REGISTRY_HOSTNAME -u $TOKEN_ID --password-stdin
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Successfully logged into Docker registry"
+        else
+          echo "❌ Failed to login to Docker registry"
+          exit 1
+        fi
         
         # Store values for later use
         echo "REGISTRY_HOSTNAME=$REGISTRY_HOSTNAME" >> $GITHUB_ENV

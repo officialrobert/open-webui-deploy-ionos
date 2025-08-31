@@ -6,8 +6,9 @@ This workflow automatically builds and deploys your WordPress applications to IO
 
 ### 1. **Authentication Flow**
 - Uses your IONOS secure token to generate an access token
+- Checks for existing container registry to avoid duplicates
+- Creates a new registry if it doesn't exist
 - Creates a container registry token for Docker authentication
-- Creates/updates the container registry
 
 ### 2. **Build Process**
 - Builds 3 separate WordPress images (app_a, app_b, app_c)
@@ -93,25 +94,72 @@ Monitor your registry in IONOS DCD:
 1. **Authentication Failed**
    - Verify `IONOS_SECURE_TOKEN` secret is correct
    - Check token permissions in IONOS DCD
+   - Ensure token has Container Registry permissions
 
 2. **Registry Creation Failed**
-   - Ensure Container Registry service is enabled
+   - Ensure Container Registry service is enabled in your IONOS account
    - Verify location is available (`de/txl`)
+   - Check if registry name already exists
 
-3. **Build Failed**
+3. **Token Creation Failed**
+   - Verify registry ID is valid
+   - Check token name uniqueness (now includes timestamp)
+   - Ensure proper scopes are defined
+
+4. **Build Failed**
    - Check Dockerfile syntax
    - Verify all required files are present
+   - Check build arguments
 
-4. **Push Failed**
+5. **Push Failed**
    - Check registry token permissions
    - Verify network connectivity
+   - Ensure Docker login was successful
 
 ### Debug Steps
 
-1. Check GitHub Actions logs for detailed error messages
-2. Verify IONOS API responses in the logs
-3. Test authentication manually using curl
-4. Check IONOS DCD for registry status
+1. **Check GitHub Actions Logs**
+   - Look for detailed error messages with HTTP codes
+   - Check API response bodies for error details
+   - Verify each step completion status
+
+2. **Verify IONOS API Responses**
+   - Access token generation: Should return HTTP 200
+   - Registry creation: Should return HTTP 202 or 200
+   - Token creation: Should return HTTP 202 or 200
+
+3. **Test Authentication Manually**
+   ```bash
+   # Test secure token
+   curl -X POST \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_SECURE_TOKEN" \
+     -d '{"grant_type": "client_credentials"}' \
+     "https://api.ionos.com/auth/v1/tokens"
+   ```
+
+4. **Check IONOS DCD**
+   - Verify Container Registry service is active
+   - Check existing registries and tokens
+   - Review API token permissions
+
+### Error Codes and Solutions
+
+| HTTP Code | Meaning | Solution |
+|-----------|---------|----------|
+| 401 | Unauthorized | Check IONOS_SECURE_TOKEN secret |
+| 403 | Forbidden | Verify token permissions |
+| 404 | Not Found | Check API endpoint URLs |
+| 409 | Conflict | Registry name already exists |
+| 422 | Validation Error | Check request payload format |
+
+### Recent Fixes Applied
+
+1. **Fixed API Endpoint Order**: Now creates registry first, then tokens
+2. **Added Error Handling**: Comprehensive error checking with HTTP codes
+3. **Improved Registry Detection**: Checks for existing registries before creating
+4. **Unique Token Names**: Includes timestamp to avoid conflicts
+5. **Better Debugging**: Enhanced logging with success/failure indicators
 
 ## 🔒 Security Features
 
@@ -119,6 +167,7 @@ Monitor your registry in IONOS DCD:
 - **Token Expiry**: Registry tokens expire after 1 year
 - **Scoped Permissions**: Minimal required permissions
 - **Secure Authentication**: Uses IONOS secure tokens
+- **Unique Token Names**: Prevents token conflicts
 
 ## 📈 Performance Optimization
 
@@ -126,6 +175,7 @@ Monitor your registry in IONOS DCD:
 - **Parallel Builds**: Each app builds independently
 - **Efficient Pushes**: Only pushes changed layers
 - **Cleanup**: Automatic cleanup of local images
+- **Registry Reuse**: Checks for existing registries
 
 ## 🔄 Manual Deployment
 
@@ -140,5 +190,10 @@ To manually trigger deployment:
 
 For issues with:
 - **GitHub Actions**: Check workflow logs and this documentation
-- **IONOS API**: Contact IONOS support
+- **IONOS API**: Contact IONOS support or check their API documentation
 - **Container Registry**: Check IONOS DCD documentation
+
+### Useful Links
+- [IONOS API Documentation](https://api.ionos.com/docs)
+- [IONOS Container Registry](https://dcd.ionos.com/container-registry)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
