@@ -1,11 +1,11 @@
-# WordPress Asynchronous Startup with Enhanced Observability
+# WordPress Weather API with Custom REST Endpoints
 
-This project provides a complete Docker setup for running WordPress with a custom REST API plugin, featuring asynchronous startup, comprehensive health monitoring, and cross-platform compatibility.
+This project provides a complete Docker setup for running WordPress with a custom REST API plugin that provides weather data integration. Features asynchronous startup, comprehensive health monitoring, and cross-platform compatibility.
 
 ## 🏗️ Architecture
 
-- **WordPress Applications**: 3 separate WordPress instances (App A, App B, App C) with custom REST API
-- **Custom REST API Plugin**: TypeScript-based plugin with Node.js-like functionality
+- **WordPress Applications**: 3 separate WordPress instances (App A, App B, App C) with custom weather REST API
+- **Weather API Plugin**: TypeScript-based plugin with OpenWeatherMap integration
 - **Database**: MySQL 8.0 (shared across all apps) with phpMyAdmin for management
 - **Asynchronous Startup**: Non-blocking container startup with real-time logging
 - **Health Monitoring**: Comprehensive resource and status monitoring
@@ -23,7 +23,7 @@ apps/wordpress/
 │   └── health.js                # Health monitoring script
 ├── wp-content/
 │   └── plugins/
-│       └── custom-rest-api/     # Custom REST API plugin
+│       └── custom-rest-api/     # Weather REST API plugin
 ├── logs/                        # Host-mounted log directories
 │   ├── app_a/                   # App A logs (startup, error, system, apache)
 │   ├── app_b/                   # App B logs
@@ -50,7 +50,8 @@ npm start
 ```
 
 **Features:**
-- ✅ 3 WordPress apps with custom REST API plugin
+- ✅ 3 WordPress apps with weather REST API plugin
+- ✅ OpenWeatherMap API integration for real-time weather data
 - ✅ Shared MySQL 8.0 database with fresh installation on each start
 - ✅ phpMyAdmin for database management
 - ✅ Cross-platform compatibility (Windows, Linux, macOS)
@@ -58,7 +59,7 @@ npm start
 - ✅ Comprehensive health monitoring
 - ✅ Host-accessible log files
 - ✅ Docker-based status checking (no PID files)
-- ✅ Health checks and API testing
+- ✅ Weather API testing and validation
 - ✅ Load balancer ready (ports 3001, 3002, 3003)
 
 ## 🛠️ Management Commands
@@ -184,7 +185,59 @@ Logs are automatically created and accessible from the host system:
 - **Real-time Access**: Logs are immediately available on host
 - **Cross-Platform**: Works on Windows, Linux, and macOS
 
-## 🧪 Testing the API
+## 🗄️ Database Structure
+
+### MySQL Database Configuration
+
+The setup uses a shared MySQL 8.0 database with separate table prefixes for each WordPress instance:
+
+- **Database Name**: `wordpress`
+- **Username**: `wordpress`
+- **Password**: `wordpress_password`
+- **Port**: `3307` (external), `3306` (internal)
+
+### Table Prefixes
+
+Each WordPress instance uses a unique table prefix to avoid conflicts:
+
+- **App A**: `wp_a_` (port 3001)
+- **App B**: `wp_b_` (port 3002)  
+- **App C**: `wp_c_` (port 3003)
+
+### WordPress Tables
+
+Each instance creates the following standard WordPress tables:
+
+**Core Tables:**
+- `wp_{prefix}_posts` - Posts and pages
+- `wp_{prefix}_users` - User accounts
+- `wp_{prefix}_options` - WordPress settings
+- `wp_{prefix}_comments` - Comments
+- `wp_{prefix}_postmeta` - Post metadata
+- `wp_{prefix}_terms` - Categories and tags
+- `wp_{prefix}_term_taxonomy` - Taxonomy definitions
+- `wp_{prefix}_term_relationships` - Post-term relationships
+
+**Global Tables (shared):**
+- `wp_users` - Global user accounts
+- `wp_usermeta` - User metadata
+
+### Database Access
+
+```bash
+# Access database via command line
+docker-compose exec db mysql -u wordpress -pwordpress_password wordpress
+
+# Check tables for specific app
+docker-compose exec db mysql -u wordpress -pwordpress_password -e "SHOW TABLES LIKE 'wp_a_%';" wordpress
+
+# Access phpMyAdmin
+# URL: http://localhost:8081
+# Username: wordpress
+# Password: wordpress_password
+```
+
+## 🧪 Testing the Weather API
 
 ### Automated Testing
 
@@ -193,66 +246,45 @@ Logs are automatically created and accessible from the host system:
 npm run test-api
 ```
 
-### Testing Table Prefix Configuration
-
-Each WordPress instance uses a unique table prefix to avoid conflicts in the shared database:
-
-- **App A**: `wp_a_` (port 3001)
-- **App B**: `wp_b_` (port 3002)  
-- **App C**: `wp_c_` (port 3003)
-
-**Note**: The application performs a fresh installation on each start, dropping and recreating all tables for each instance. This ensures a clean slate every time you start the application.
-
-To verify the table prefixes are working correctly:
+### Manual Weather API Testing
 
 ```bash
-# Check database tables after startup
-docker-compose exec db mysql -u wordpress -pwordpress_password -e "SHOW TABLES;" wordpress
+# Test weather API for different cities
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/weather&city=London"
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/weather&city=New York"
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/weather&city=Tokyo"
 
-# You should see tables like:
-# wp_a_posts, wp_a_users, wp_a_options (for App A)
-# wp_b_posts, wp_b_users, wp_b_options (for App B)
-# wp_c_posts, wp_c_users, wp_c_options (for App C)
-```
-
-### Manual Testing
-
-```bash
-# Health check for all apps
+# Test health endpoints
 curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/health"
 curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/health"
 curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/health"
 
-# Get posts from all apps
-curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/posts"
-curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/posts"
-curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/posts"
-
-# Get users from all apps
-curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/users"
-curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/users"
-curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/users"
-
-# Get Node.js-like data from all apps
-curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/node-data"
-curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/node-data"
-curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/node-data"
+# Get OpenAPI specification
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/openapi.json"
 ```
 
 ## 🌐 Access Points
 
 Once the environment is running, you can access:
 
-### Full Stack Environment
+### WordPress Applications
 - **App A - WordPress**: http://localhost:3001
 - **App A - Admin**: http://localhost:3001/wp-admin
-- **App A - REST API**: http://localhost:3001/index.php?rest_route=/custom-api/v1/health
 - **App B - WordPress**: http://localhost:3002
 - **App B - Admin**: http://localhost:3002/wp-admin
-- **App B - REST API**: http://localhost:3002/index.php?rest_route=/custom-api/v1/health
 - **App C - WordPress**: http://localhost:3003
 - **App C - Admin**: http://localhost:3003/wp-admin
-- **App C - REST API**: http://localhost:3003/index.php?rest_route=/custom-api/v1/health
+
+### Weather API Endpoints
+- **App A - Weather API**: http://localhost:3001/index.php?rest_route=/custom-api/v1/weather&city=London
+- **App B - Weather API**: http://localhost:3002/index.php?rest_route=/custom-api/v1/weather&city=London
+- **App C - Weather API**: http://localhost:3003/index.php?rest_route=/custom-api/v1/weather&city=London
+
+### Health & Documentation
+- **Health Check**: http://localhost:3001/index.php?rest_route=/custom-api/v1/health
+- **OpenAPI Spec**: http://localhost:3001/index.php?rest_route=/custom-api/v1/openapi.json
+
+### Database Management
 - **phpMyAdmin**: http://localhost:8081
 - **MySQL Database**: localhost:3307
 
@@ -274,101 +306,56 @@ npm run health
 npm run logs:app_a
 ```
 
-### 3. Edit Plugin Code
+### 3. Test Weather API
 
-The plugin source is available for editing:
+```bash
+# Test weather endpoints
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/weather&city=London"
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/health"
+
+# Run automated tests
+npm run test-api
+```
+
+### 4. Plugin Development
+
+The weather API plugin source is available for editing:
 - Edit `wp-content/plugins/custom-rest-api/src/api.ts`
 - Rebuild the plugin if needed: `npm run build:plugin`
 - Refresh browser to see changes
 
-### 4. Test Changes
-
-```bash
-# Test API endpoints for all apps
-npm run test-api
-
-# Or manually test in browser
-curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/health"
-curl "http://localhost:3002/index.php?rest_route=/custom-api/v1/health"
-curl "http://localhost:3003/index.php?rest_route=/custom-api/v1/health"
-```
-
-## 🚀 Build Optimization
-
-### Multi-Stage Docker Build
-
-This project uses a multi-stage Docker build to optimize build times across multiple WordPress instances:
-
-#### Build Stages
-
-1. **Base Stage** (`base`): Contains system dependencies, PHP extensions, Node.js, and WP-CLI
-2. **WordPress Base Stage** (`wordpress-base`): Contains WordPress core files and Apache configuration  
-3. **Dependencies Stage** (`dependencies`): Installs Node.js dependencies for the main app and plugin
-4. **App Stage** (`app`): Final stage with all application files and dependencies
-
-#### Benefits
-
-- ✅ **Shared Dependencies**: System packages, PHP extensions, and Node.js are installed once and reused
-- ✅ **Cached Layers**: WordPress core files and dependencies are cached across builds
-- ✅ **Faster Builds**: Subsequent builds only rebuild changed application files
-- ✅ **Smaller Images**: Each stage only contains what's needed for that layer
-- ✅ **Consistent Builds**: All WordPress instances use the same base layers
-
-#### Cache Management
-
-```bash
-# Cache is built automatically on first run
-# Manual cache management (optional):
-
-# Build cache manually
-npm run build:cache
-
-# Clean build cache
-npm run build:cache:clean
-```
-
-## 🐳 Docker Configuration Details
+## 🔧 API Configuration
 
 ### Environment Variables
 
+The weather API requires the following environment variables:
+
 ```yaml
-# WordPress Configuration (for each app)
-WORDPRESS_DB_HOST: db:3306
-WORDPRESS_DB_NAME: wordpress
-WORDPRESS_DB_USER: wordpress
-WORDPRESS_DB_PASSWORD: wordpress_password
-WORDPRESS_URL: http://localhost:3001 (App A), 3002 (App B), 3003 (App C)
-WORDPRESS_TITLE: "WordPress App X - Custom REST API"
-WORDPRESS_ADMIN_USER: admin
-WORDPRESS_ADMIN_PASSWORD: admin
-WORDPRESS_ADMIN_EMAIL: admin@example.com
-WORDPRESS_DEBUG: 1
-WORDPRESS_TABLE_PREFIX: wp_a_ (App A), wp_b_ (App B), wp_c_ (App C)
+# OpenWeatherMap API Key (required)
+OPEN_WEATHER_MAP_KEY: "your_api_key_here"
 
-# MySQL Configuration
-MYSQL_ROOT_PASSWORD: rootpassword
-MYSQL_DATABASE: wordpress
-MYSQL_USER: wordpress
-MYSQL_PASSWORD: wordpress_password
-
-# phpMyAdmin Configuration
-PMA_HOST: db
-PMA_PORT: 3306
-PMA_USER: wordpress
-PMA_PASSWORD: wordpress_password
+# Optional API Keys
+NEWSAPI_KEY: ""
+DUCKDUCKGO_ENABLED: "true"
 ```
 
-## 🔍 Troubleshooting
+### API Key Setup
+
+1. Get your free API key from [OpenWeatherMap](https://openweathermap.org/api)
+2. Set the `OPEN_WEATHER_MAP_KEY` environment variable in `docker-compose.yml`
+3. Restart the containers: `npm run reset`
+
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-1. **Port Conflicts**
+1. **Weather API Not Working**
    ```bash
-   # Check what's using the ports
-   netstat -an | findstr :3001  # Windows
-   netstat -tuln | grep :3001   # Linux/macOS
+   # Check if API key is set
+   docker-compose exec app_a env | grep OPEN_WEATHER_MAP_KEY
    
-   # Or use different ports in docker-compose.yml
+   # Check plugin logs
+   npm run logs:app_a
    ```
 
 2. **Database Connection Issues**
@@ -380,31 +367,11 @@ PMA_PASSWORD: wordpress_password
    npm run health
    ```
 
-3. **Plugin Not Working**
+3. **Port Conflicts**
    ```bash
-   # Check WordPress logs
-   npm run logs:app_a
-   
-   # Rebuild plugin
-   npm run build:plugin
-   ```
-
-4. **Container Not Starting**
-   ```bash
-   # Check health status
-   npm run health
-   
-   # View startup logs
-   npm run logs:app_a
-   ```
-
-5. **Table Prefix Issues**
-   ```bash
-   # Check if table prefixes are working
-   docker-compose exec db mysql -u wordpress -pwordpress_password -e "SHOW TABLES;" wordpress
-   
-   # If tables are not separated, restart the containers
-   npm run reset
+   # Check what's using the ports
+   netstat -an | findstr :3001  # Windows
+   netstat -tuln | grep :3001   # Linux/macOS
    ```
 
 ### Debug Mode
@@ -434,10 +401,8 @@ cat ./logs/app_a/error.log
 # Comprehensive health check
 npm run health
 
-# Check service health for all apps
-docker-compose exec app_a curl -f "http://localhost/index.php?rest_route=/custom-api/v1/health"
-docker-compose exec app_b curl -f "http://localhost/index.php?rest_route=/custom-api/v1/health"
-docker-compose exec app_c curl -f "http://localhost/index.php?rest_route=/custom-api/v1/health"
+# Check weather API health
+curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/health"
 
 # Monitor logs
 npm run start:logs
@@ -449,107 +414,9 @@ npm run start:logs
 # Check container resource usage
 npm run health
 
-# Check WordPress performance for all apps
-curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3001/index.php?rest_route=/custom-api/v1/health"
-curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3002/index.php?rest_route=/custom-api/v1/health"
-curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3003/index.php?rest_route=/custom-api/v1/health"
+# Test weather API performance
+curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3001/index.php?rest_route=/custom-api/v1/weather&city=London"
 ```
-
-## 🔒 Security
-
-### Production Security
-
-- Debug mode disabled
-- Error display disabled
-- Secure file permissions
-- Database credentials in environment variables
-- HTTPS ready (add SSL certificates)
-
-### Development Security
-
-- Debug mode enabled for troubleshooting
-- Source code accessible for development
-- Database exposed for management
-
-## 🚀 Deployment
-
-### Local Build
-
-```bash
-# Start environment
-npm start
-
-# Verify deployment
-npm run health
-npm run test-api
-```
-
-### Production Deployment
-
-1. **Build Images:**
-   ```bash
-   docker-compose build app_a app_b app_c
-   ```
-
-2. **Tag for Registry:**
-   ```bash
-   docker tag wordpress-app-a:latest your-registry/wordpress-app-a:latest
-   docker tag wordpress-app-b:latest your-registry/wordpress-app-b:latest
-   docker tag wordpress-app-c:latest your-registry/wordpress-app-c:latest
-   ```
-
-3. **Push to Registry:**
-   ```bash
-   docker push your-registry/wordpress-app-a:latest
-   docker push your-registry/wordpress-app-b:latest
-   docker push your-registry/wordpress-app-c:latest
-   ```
-
-4. **Deploy:**
-   ```bash
-   # On production server
-   docker-compose pull
-   docker-compose up -d
-   ```
-
-## 📚 API Documentation
-
-### Available Endpoints
-
-- `GET /index.php?rest_route=/custom-api/v1/health` - Health check
-- `GET /index.php?rest_route=/custom-api/v1/posts` - Get WordPress posts
-- `GET /index.php?rest_route=/custom-api/v1/users` - Get WordPress users
-- `GET /index.php?rest_route=/custom-api/v1/node-data` - Node.js-like data
-
-### Response Format
-
-```json
-{
-  "status": "OK",
-  "timestamp": "2023-12-01T10:00:00+00:00",
-  "service": "WordPress Custom REST API",
-  "version": "1.0.0"
-}
-```
-
-## 🌍 Cross-Platform Compatibility
-
-This project is designed to work seamlessly across different operating systems:
-
-### Windows
-- Uses PowerShell for command execution
-- Windows-compatible port checking
-- Proper path handling
-
-### Linux/macOS
-- Uses Bash for command execution
-- Unix-compatible port checking
-- Standard path handling
-
-### Docker Commands
-- Universal Docker interface
-- Cross-platform container management
-- Consistent behavior across platforms
 
 ## 🤝 Contributing
 
@@ -570,6 +437,6 @@ For support and questions:
 1. Check the troubleshooting section
 2. Run health check: `npm run health`
 3. Review logs: `npm run logs:app_a`
-4. Test API endpoints: `npm run test-api`
+4. Test weather API: `curl "http://localhost:3001/index.php?rest_route=/custom-api/v1/weather&city=London"`
 5. Check WordPress debug logs in `./logs/` directory
 
